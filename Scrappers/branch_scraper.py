@@ -1,9 +1,10 @@
 # Standard Library Imports
+import sys
 import os
 import logging
 import time
 import xml.etree.ElementTree as ET
-from datetime import datetime
+from configparser import ConfigParser
 
 # Third-Party Libraries
 import pandas as pd
@@ -14,6 +15,11 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 from webdriver_manager.chrome import ChromeDriverManager
+from sqlalchemy import create_engine
+
+# Project custom Libs
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+from Connections.connection import connect_to_postgres_data
 
 # Constants
 BASE_URL = 'https://url.publishedprices.co.il/file/d/'
@@ -22,15 +28,9 @@ USERNAME = 'freshmarket'
 WAIT_TIME = 10
 
 # Set up Logging
-log_dir = os.path.join(os.path.dirname(__file__), "logs")
-os.makedirs(log_dir, exist_ok=True)
-log_path = os.path.join(
-    log_dir, f"{os.path.splitext(os.path.basename(__file__))[0]}_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.log")
-
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(message)s",
-    handlers=[logging.FileHandler(log_path), logging.StreamHandler()]
+    format="%(asctime)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
@@ -118,7 +118,7 @@ def parse_xml_to_dataframe(root: ET.Element) -> pd.DataFrame:
         data = [{child.tag: child.text for child in store}
                 for store in root.findall('.//Stores/Store')]
         df = pd.DataFrame(data)
-        df.columns = [col.upper() for col in df.columns]
+        df.columns = [col.lower() for col in df.columns]
 
         # Adjust specific columns for RTL by reversing text
         for col in ['ADDRESS', 'STORENAME', 'CITY']:
@@ -132,8 +132,17 @@ def parse_xml_to_dataframe(root: ET.Element) -> pd.DataFrame:
         logger.error(f"Error converting XML content to DataFrame: {e}")
         raise
 
+def insert_dataframe_to_postgres(engine, df: pd.DataFrame, table_name: str):
+    """Inserts a DataFrame into a specified PostgreSQL table."""
+    try:
+        df.to_sql(table_name, con=engine, schema='raw_data', if_exists='replace', index=False)
+        logger.info(f"Data inserted successfully into {table_name}.")
+    except Exception as e:
+        logger.error(f"Error inserting data into PostgreSQL: {e}")
 
 def main():
+    target_table_name = 'snifim'
+    
     driver = setup_driver()
     try:
         login_to_site(driver)
@@ -152,9 +161,22 @@ def main():
         logger.info(f"DataFrame created with {len(df)} rows.")
     except Exception as e:
         logger.critical(f"An error occurred: {e}")
+        sys.exit(1)
     finally:
-        driver.quit()
+        driver.quit() if driver else None  
         logger.info("WebDriver session closed.")
+
+    try:
+        conn, engine = connect_to_postgres_data()
+        if conn:
+            insert_dataframe_to_postgres(engine, df, target_table_name)
+    except Exception as e:
+        logger.critical(f"An error occurred with database operations: {e}")
+    finally:
+        conn.close() if conn else None    
+        engine.dispose() if engine else None
+        logger.info('Connection closed.')
+
 
 
 if __name__ == "__main__":
