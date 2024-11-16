@@ -1,6 +1,7 @@
-beautifulsoup4==4.12.2
-pandas==2.1.1
-requests==2.31.0
-selenium==4.26.1
-webdriver-manager==4.0.2
-psycopg2-binary==2.9.10
+beautifulsoup4
+pandas
+requests
+selenium
+webdriver-manager
+psycopg2-binary
+sqlalchemy

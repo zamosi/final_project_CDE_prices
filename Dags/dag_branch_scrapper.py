@@ -10,7 +10,7 @@ default_args = {
     'email': ['alexeyserdtse@gmail.com'],  # Set your email for notifications
     'email_on_failure': True,  # Send email if the task fails
     'email_on_retry': False,
-    'retries': 3,
+    'retries': 1,
     'retry_delay': timedelta(minutes=1),  # Retry delay of 1 minute
 }
 
@@ -29,7 +29,7 @@ with DAG(
     run_scraper = SSHOperator(
         task_id='run_branch_scraper',
         ssh_conn_id='ssh_default',
-        command='python3 /home/developer/projects/CDE_Final_Project/Scrappers/branch_scraper.py'
+        command='python3 /home/developer/projects/spark-course-python/final_project_CDE_prices/Scrappers/branch_scraper.py'
     )
 
     run_scraper
