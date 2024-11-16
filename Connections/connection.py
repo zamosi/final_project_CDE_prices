@@ -17,6 +17,14 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 def connect_to_postgres_data():
+    """
+    Connects to a PostgreSQL database  based on values parsed from config file and returns a connection 
+    object and SQLAlchemy engine.
+
+    Returns:
+        tuple: A tuple containing the psycopg2 connection object and SQLAlchemy engine.
+               Returns None if an error occurs.
+    """    
     try:
         # Connect to PostgreSQL using psycopg2-binary
         conn = connect(
