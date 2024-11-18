@@ -29,7 +29,7 @@ with DAG(
     run_scraper = SSHOperator(
         task_id='run_branch_scraper',
         ssh_conn_id='ssh_default',
-        command='python3 /home/developer/projects/spark-course-python/final_project_CDE_prices/Scrappers/branch_scraper.py'
+        command='python3 /home/developer/projects/spark-course-python/spark_course_python/final_project_CDE_prices/Scrappers/branch_scraper.py'
     )
 
     run_scraper
