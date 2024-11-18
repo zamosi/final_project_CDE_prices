@@ -32,6 +32,6 @@ A comprehensive project focused on cloud data engineering and price analytics, l
   </a>
 
 - **Alexey Serdtse**  
-  <a href="https://www.linkedin.com/in/alexeyserdtse/" target="_blank">
+  <a href="https://www.linkedin.com/in/alexey-serdtse/" target="_blank">
     <img src="https://seeklogo.com/images/L/linkedin-logo-920846F1F7-seeklogo.com.png" alt="LinkedIn" width="65" style="vertical-align:middle; margin-left:35px;">
   </a>
