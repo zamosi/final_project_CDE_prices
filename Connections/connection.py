@@ -7,7 +7,7 @@ from sqlalchemy import create_engine
 
 # Read database configuration from the config file
 config = ConfigParser()
-config.read("/home/developer/projects/spark-course-python/spark_course_python/final_project_CDE_prices/config/config.conf")
+config.read("/home/developer/projects/spark-course-python/spark_course_python/final_project/final_project_CDE_prices/config/config.conf")
 
 
 logging.basicConfig(
