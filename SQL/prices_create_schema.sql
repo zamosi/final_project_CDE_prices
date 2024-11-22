@@ -45,5 +45,6 @@ CREATE TABLE RAW_DATA.RESHATOT (
     reshet_num bigint,
     vendor_website varchar(100),
     user_name varchar(100),
-    password varchar(255)
+    password varchar(255),
+	file_date TIMESTAMP
 );
