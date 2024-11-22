@@ -38,3 +38,12 @@ CREATE TABLE RAW_DATA.PRICES(
 	num_snif int NULL,
 	file_date TIMESTAMP NULL
 );
+
+
+CREATE TABLE RAW_DATA.RESHATOT (
+    reshet_name varchar(255),
+    reshet_num bigint,
+    vendor_website varchar(100),
+    user_name varchar(100),
+    password varchar(255)
+);
