@@ -25,8 +25,8 @@ from Connections.connection import connect_to_postgres_data
 # Constants
 BASE_URL = 'https://url.publishedprices.co.il/file/d/'
 LOGIN_URL = 'https://url.publishedprices.co.il/login'
-USERNAME = 'freshmarket'
-WAIT_TIME = 10
+# USERNAME = 'freshmarket'
+WAIT_TIME = 20
 
 # Set up Logging
 logging.basicConfig(
@@ -34,6 +34,15 @@ logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
+
+def table_to_df(table_name:str,engine) ->pd.DataFrame:
+    try:
+        query = f"SELECT * FROM {table_name}"
+        df = pd.read_sql(query, engine)
+        logger.info(f"Table {table_name} loaded successfully.")
+        return df
+    except Exception as e:
+        logger.error(f"An error occurred: {e}")
 
 
 def setup_driver() -> webdriver.Chrome:
@@ -59,7 +68,7 @@ def setup_driver() -> webdriver.Chrome:
         raise
 
 
-def login_to_site(driver: webdriver.Chrome) -> None:
+def login_to_site(driver: webdriver.Chrome,USERNAME:str,PASSWORD:str) -> None:
     """
     Navigates to the login page, enters the username, and submits the login form.
     Includes error handling and logging to ensure any issues during the login
@@ -71,6 +80,7 @@ def login_to_site(driver: webdriver.Chrome) -> None:
     try:
         driver.get(LOGIN_URL)
         driver.find_element(By.NAME, 'username').send_keys(USERNAME)
+        driver.find_element(By.NAME, 'password').send_keys(PASSWORD)
         driver.find_element(By.ID, 'login-button').click()
         time.sleep(WAIT_TIME)
         logger.info("Login successful.")
@@ -219,59 +229,70 @@ def insert_dataframe_to_postgres(engine, df: pd.DataFrame, table_name: str):
 def main():
     # target_table_name = 'prices'
 
-    driver = setup_driver()
+    
+
     try:
-        login_to_site(driver)
-        soup = fetch_page_soup(driver)
-        session = get_session_with_cookies(driver)
-        # Extract XML file links from the webpage
-        xml_files = find_xml_links(soup)
-
-        if not xml_files:
-            logger.warning("No XML files found.")
-            return
-        try:
         # Connect to PostgreSQL and insert the DataFrame
-            conn, engine = connect_to_postgres_data()
-        except Exception as e:
-            logger.critical(f"An error occurred with database operations: {e}")
+        conn, engine = connect_to_postgres_data()
 
-        for i,file in enumerate(xml_files):
+        df = table_to_df(table_name='raw_data.reshatot',engine=engine)
+        df.fillna("", inplace=True)
+    except Exception as e:
+        logger.critical(f"An error occurred with database operations: {e}")
 
-            # Create a session with cookies to use for file download
-            file_url = f"{BASE_URL}{file}"
-            logger.info(f"Fetching file: {file} file{i}")
-
-            target_table_name = 'prices' if file.startswith("Price") else 'snifim'
-
-            # Download XML file and parse it into a DataFrame
-            df = download_and_parse_xml(session, file_url,file)
-
-            logger.info(f"DataFrame created with {len(df)} rows.")
-            if conn:
-                insert_dataframe_to_postgres(engine, df, target_table_name)
-                logger.info(f"DataFrame {i} add to DB")
+    
+    try:
         
+        for row in df.itertuples():
+            driver = setup_driver()
+            USERNAME = row.user_name
+            PASSWORD = row.password
+            logger.info(f"start user name {USERNAME}")
+
+        
+            login_to_site(driver,USERNAME,PASSWORD)
+            soup = fetch_page_soup(driver)
+            session = get_session_with_cookies(driver)
+            # Extract XML file links from the webpage
+            xml_files = find_xml_links(soup)
+
+            if not xml_files:
+                logger.warning("No XML files found.")
+                continue
+            
+            for i,file in enumerate(xml_files):
+                
+                # if i==3:
+                #     break       
+
+                # Create a session with cookies to use for file download
+                file_url = f"{BASE_URL}{file}"
+                logger.info(f"Fetching file: {file} file{i}")
+
+                target_table_name = 'prices' if file.startswith("Price") else 'snifim'
+
+                # Download XML file and parse it into a DataFrame
+                df = download_and_parse_xml(session, file_url,file)
+
+                logger.info(f"DataFrame created with {len(df)} rows.")
+                if conn:
+                    insert_dataframe_to_postgres(engine, df, target_table_name)
+                    logger.info(f"DataFrame {i} add to DB")
+
+            driver.quit() if driver else None
+            logger.info(f"WebDriver session {USERNAME} closed.")
+            
+            
     except Exception as e:
         logger.critical(f"An error occurred: {e}")
         sys.exit(1)
-    finally:
-        # Ensure the WebDriver is properly closed
-        driver.quit() if driver else None
-        logger.info("WebDriver session closed.")
 
-    # try:
-    #     # Connect to PostgreSQL and insert the DataFrame
-    #     conn, engine = connect_to_postgres_data()
-    #     if conn:
-    #         insert_dataframe_to_postgres(engine, df, target_table_name)
-    # except Exception as e:
-    #     logger.critical(f"An error occurred with database operations: {e}")
-    # finally:
-        # Clean up database resources
-        conn.close() if conn else None    
-        engine.dispose() if engine else None
-        logger.info('Connection closed.')
+
+
+    
+    conn.close() if conn else None    
+    engine.dispose() if engine else None
+    logger.info('Connection closed.')
 
 
 
