@@ -182,12 +182,6 @@ def parse_xml_to_dataframe(root: ET.Element,path:str) -> pd.DataFrame:
         df = pd.DataFrame(data) 
         df.columns = [col.lower() for col in df.columns]
 
-        # Adjust specific columns for RTL by reversing text
-        # for col in ['ADDRESS', 'STORENAME', 'CITY']:
-        #     if col in df.columns:
-        #         df[col] = df[col].apply(
-        #             lambda x: x[::-1] if isinstance(x, str) else x)
-
         logger.info("Converted XML content to DataFrame with RTL adjustments.")
         return df
     except Exception as e:
@@ -260,15 +254,7 @@ def main():
         driver.quit() if driver else None
         logger.info("WebDriver session closed.")
 
-    # try:
-    #     # Connect to PostgreSQL and insert the DataFrame
-    #     conn, engine = connect_to_postgres_data()
-    #     if conn:
-    #         insert_dataframe_to_postgres(engine, df, target_table_name)
-    # except Exception as e:
-    #     logger.critical(f"An error occurred with database operations: {e}")
-    # finally:
-        # Clean up database resources
+
         conn.close() if conn else None    
         engine.dispose() if engine else None
         logger.info('Connection closed.')

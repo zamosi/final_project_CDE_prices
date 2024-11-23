@@ -1,7 +1,10 @@
+# Standard Library Imports
+from datetime import datetime, timedelta
+
+# Third-Party Libraries
 from airflow import DAG
 from airflow.contrib.operators.ssh_operator import SSHOperator
 from airflow.operators.email import EmailOperator
-from datetime import datetime, timedelta
 
 # Define default arguments for the DAG
 default_args = {
@@ -26,10 +29,18 @@ with DAG(
 ) as dag:
 
     # Task to run the branch scraper script
+    validation = SSHOperator(
+        task_id='Validate_Schema_In_DB',
+        ssh_conn_id='ssh_default',
+        command='python3 /home/developer/projects/spark-course-python/spark_course_python/final_project/final_project_CDE_prices/Tests/validate_schema.py'
+    )
+
+
+    # Task to run the branch scraper script
     run_scraper = SSHOperator(
         task_id='run_branch_scraper',
         ssh_conn_id='ssh_default',
-        command='python3 /home/developer/projects/spark-course-python/spark_course_python/final_project/final_project_CDE_prices/Scrappers/branch_scraper.py'
+        command='python3 /home/developer/projects/spark-course-python/spark_course_python/final_project/final_project_CDE_prices/Scrappers/branch_scraper_all_files.py'
     )
 
-    run_scraper
+    validation >> run_scraper
