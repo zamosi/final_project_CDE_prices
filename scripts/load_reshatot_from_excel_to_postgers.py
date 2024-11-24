@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 excel_path = '/home/developer/projects/spark-course-python/spark_course_python/final_project/final_project_CDE_prices/Files/markets_deatails_pub.xlsx'
 
 df = pd.read_excel(excel_path)
-df['file_date'] = datetime.now()
+df['run_time'] = datetime.now()
 print(df)
 conn, engine = connect_to_postgres_data()
 try:

@@ -7,6 +7,8 @@ import xml.etree.ElementTree as ET
 import gzip
 from io import BytesIO
 from datetime import datetime
+import re
+
 
 # Third-Party Libraries
 import pandas as pd
@@ -44,7 +46,6 @@ def table_to_df(table_name:str,engine) ->pd.DataFrame:
     except Exception as e:
         logger.error(f"An error occurred: {e}")
 
-
 def setup_driver() -> webdriver.Chrome:
     """    
     This function sets up a Chrome WebDriver with headless mode and additional 
@@ -67,7 +68,6 @@ def setup_driver() -> webdriver.Chrome:
         logger.error(f"Error setting up WebDriver: {e}")
         raise
 
-
 def login_to_site(driver: webdriver.Chrome,USERNAME:str,PASSWORD:str) -> None:
     """
     Navigates to the login page, enters the username, and submits the login form.
@@ -88,7 +88,6 @@ def login_to_site(driver: webdriver.Chrome,USERNAME:str,PASSWORD:str) -> None:
         logger.error(f"Error during login: {e}")
         raise
 
-
 def fetch_page_soup(driver: webdriver.Chrome) -> BeautifulSoup:
     """
     This function fetches the HTML content of the currently loaded page in the 
@@ -105,7 +104,6 @@ def fetch_page_soup(driver: webdriver.Chrome) -> BeautifulSoup:
     except Exception as e:
         logger.error(f"Error fetching page source: {e}")
         raise
-
 
 def get_session_with_cookies(driver: webdriver.Chrome) -> requests.Session:
     """
@@ -128,7 +126,6 @@ def get_session_with_cookies(driver: webdriver.Chrome) -> requests.Session:
         logger.error(f"Error setting up session with cookies: {e}")
         raise
 
-
 def find_xml_links(soup: BeautifulSoup) -> list:
     """
     Searches for tags with the specified class and filters for titles 
@@ -149,8 +146,7 @@ def find_xml_links(soup: BeautifulSoup) -> list:
         logger.error(f"Error finding XML links: {e}")
         raise
 
-
-def download_and_parse_xml(session: requests.Session, file_url: str,file:str) -> pd.DataFrame:
+def download_and_parse_xml(session: requests.Session, file_url: str,file_name:str) -> pd.DataFrame:
     """
     Uses a `requests.Session` to download and extract the gz file to xml file, decodes it with UTF-8 
     encoding, parses it into an ElementTree object, and converts it into a 
@@ -164,7 +160,7 @@ def download_and_parse_xml(session: requests.Session, file_url: str,file:str) ->
         pd.DataFrame: A pandas DataFrame containing the parsed XML data.
     """
     try:
-        if file.startswith("Price"):
+        if file_name.startswith("Price"):
         
             response = session.get(file_url)
             with gzip.open(BytesIO(response.content), 'rb') as gz_file:
@@ -179,11 +175,10 @@ def download_and_parse_xml(session: requests.Session, file_url: str,file:str) ->
             path = './/Stores/Store'
         logger.info(f"Downloaded and parsed XML file from {file_url}")
         df = parse_xml_to_dataframe(root,path)
-        return add_columns_to_df(df,file_url)
+        return add_columns_to_df(df,file_name)
     except (requests.RequestException, ET.ParseError) as e:
         logger.error(f"Error processing XML file from {file_url}: {e}")
         raise
-
 
 def parse_xml_to_dataframe(root: ET.Element,path:str) -> pd.DataFrame:
     try:
@@ -204,9 +199,13 @@ def parse_xml_to_dataframe(root: ET.Element,path:str) -> pd.DataFrame:
         logger.error(f"Error converting XML content to DataFrame: {e}")
         raise
 
-def add_columns_to_df(df:pd.DataFrame,file_url: str)-> pd.DataFrame:
-    df['file_name'] =file_url
-    df['file_date'] =datetime.now()
+def add_columns_to_df(df:pd.DataFrame,file_name: str)-> pd.DataFrame:
+    date_string = file_name.split('-')[2].replace('.gz','').replace('.xml','')
+    df['file_name'] =file_name
+    df['num_reshet'] =file_name.split('-')[0].replace('PriceFull','').replace('Price','').replace('Stores','')
+    df['num_snif'] =file_name.split('-')[1]
+    df['file_date'] = datetime.strptime(date_string, "%Y%m%d%H%M")
+    df['run_time'] = datetime.now()
     return df
 
 def insert_dataframe_to_postgres(engine, df: pd.DataFrame, table_name: str):
@@ -227,9 +226,6 @@ def insert_dataframe_to_postgres(engine, df: pd.DataFrame, table_name: str):
         logger.error(f"Error inserting data into PostgreSQL: {e}")
 
 def main():
-    # target_table_name = 'prices'
-
-    
 
     try:
         # Connect to PostgreSQL and insert the DataFrame
@@ -262,8 +258,8 @@ def main():
             
             for i,file in enumerate(xml_files):
                 
-                # if i==3:
-                #     break       
+                if i==3:
+                    break       
 
                 # Create a session with cookies to use for file download
                 file_url = f"{BASE_URL}{file}"

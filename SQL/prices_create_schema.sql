@@ -11,7 +11,8 @@ CREATE TABLE RAW_DATA.SNIFIM (
     file_name VARCHAR(255) NULL,
     num_reshet BIGINT NULL,
     num_snif INT NULL,
-    file_date TIMESTAMP NULL
+    file_date TIMESTAMP NULL,
+    run_time TIMESTAMP NULL
 );
 
 CREATE TABLE RAW_DATA.PRICES (
@@ -35,7 +36,8 @@ CREATE TABLE RAW_DATA.PRICES (
     file_name VARCHAR(255) NULL,
     num_reshet BIGINT NULL,
     num_snif INT NULL,
-    file_date TIMESTAMP NULL
+    file_date TIMESTAMP NULL,
+    run_time TIMESTAMP NULL
 );
 
 CREATE TABLE RAW_DATA.RESHATOT (
@@ -44,5 +46,5 @@ CREATE TABLE RAW_DATA.RESHATOT (
     vendor_website VARCHAR(100),
     user_name VARCHAR(100),
     password VARCHAR(255),
-    file_date TIMESTAMP
+    run_time TIMESTAMP
 );
