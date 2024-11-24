@@ -10,7 +10,6 @@ CREATE TABLE RAW_DATA.SNIFIM (
     zipcode VARCHAR(20),
     file_name VARCHAR(255) NULL,
     num_reshet BIGINT NULL,
-    num_snif INT NULL,
     file_date TIMESTAMP NULL,
     run_time TIMESTAMP NULL
 );

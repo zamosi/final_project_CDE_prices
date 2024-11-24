@@ -200,10 +200,11 @@ def parse_xml_to_dataframe(root: ET.Element,path:str) -> pd.DataFrame:
         raise
 
 def add_columns_to_df(df:pd.DataFrame,file_name: str)-> pd.DataFrame:
-    date_string = file_name.split('-')[2].replace('.gz','').replace('.xml','')
+    date_string = file_name.split('-')[2].replace('.gz','') if file_name.startswith("Price") else file_name.split('-')[1].replace('.xml','')
     df['file_name'] =file_name
     df['num_reshet'] =file_name.split('-')[0].replace('PriceFull','').replace('Price','').replace('Stores','')
-    df['num_snif'] =file_name.split('-')[1]
+    if file_name.startswith("Price"):
+        df['num_snif'] =file_name.split('-')[1] 
     df['file_date'] = datetime.strptime(date_string, "%Y%m%d%H%M")
     df['run_time'] = datetime.now()
     return df
@@ -226,7 +227,7 @@ def insert_dataframe_to_postgres(engine, df: pd.DataFrame, table_name: str):
         logger.error(f"Error inserting data into PostgreSQL: {e}")
 
 def main():
-
+    error_file = []
     try:
         # Connect to PostgreSQL and insert the DataFrame
         conn, engine = connect_to_postgres_data()
@@ -258,22 +259,26 @@ def main():
             
             for i,file in enumerate(xml_files):
                 
-                if i==3:
-                    break       
+                # if i==3:
+                #     break       
 
                 # Create a session with cookies to use for file download
                 file_url = f"{BASE_URL}{file}"
                 logger.info(f"Fetching file: {file} file{i}")
 
                 target_table_name = 'prices' if file.startswith("Price") else 'snifim'
+                
+                #Download XML file and parse it into a DataFrame
+                try:
+                    df = download_and_parse_xml(session, file_url,file)
+                    logger.info(f"DataFrame created with {len(df)} rows.")
+                    if conn:
+                        insert_dataframe_to_postgres(engine, df, target_table_name)
+                        logger.error(f"DataFrame {i} add to DB")
+                except Exception as e:
+                    logger.error(f"An error occurred when file download - {file}:{e}")
+                    error_file.append(file)
 
-                # Download XML file and parse it into a DataFrame
-                df = download_and_parse_xml(session, file_url,file)
-
-                logger.info(f"DataFrame created with {len(df)} rows.")
-                if conn:
-                    insert_dataframe_to_postgres(engine, df, target_table_name)
-                    logger.info(f"DataFrame {i} add to DB")
 
             driver.quit() if driver else None
             logger.info(f"WebDriver session {USERNAME} closed.")
@@ -289,6 +294,7 @@ def main():
     conn.close() if conn else None    
     engine.dispose() if engine else None
     logger.info('Connection closed.')
+    print(error_file)
 
 
 
