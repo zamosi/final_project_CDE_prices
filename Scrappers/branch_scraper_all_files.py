@@ -259,8 +259,8 @@ def main():
             
             for i,file in enumerate(xml_files):
                 
-                # if i==3:
-                #     break       
+                if i==3:
+                    break       
 
                 # Create a session with cookies to use for file download
                 file_url = f"{BASE_URL}{file}"
@@ -274,7 +274,7 @@ def main():
                     logger.info(f"DataFrame created with {len(df)} rows.")
                     if conn:
                         insert_dataframe_to_postgres(engine, df, target_table_name)
-                        logger.error(f"DataFrame {i} add to DB")
+                        logger.info(f"DataFrame {i} add to DB")
                 except Exception as e:
                     logger.error(f"An error occurred when file download - {file}:{e}")
                     error_file.append(file)
