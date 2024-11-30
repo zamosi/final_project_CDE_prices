@@ -35,7 +35,14 @@ with DAG(
         command='python3 /home/developer/projects/spark-course-python/spark_course_python/final_project/final_project_CDE_prices/Tests/validate_schema.py'
     )
 
-    # Task to execute the branch scraper script over SSH to scrape data from branches
+    # Task loads markets list using a Python script over SSH
+    load_markets = SSHOperator(
+        task_id='Load_Markets_List',
+        ssh_conn_id='ssh_default',
+        command='python3 /home/developer/projects/spark-course-python/spark_course_python/final_project/final_project_CDE_prices/scripts/load_reshatot_from_excel_to_postgers.py'
+    )   
+
+    # Task run scrapper for all the markets using a Python script over SSH
     run_scraper = SSHOperator(
         task_id='run_branch_scraper',
         ssh_conn_id='ssh_default',
@@ -43,4 +50,4 @@ with DAG(
     )
 
     # Steps of the DAG
-    validation >> run_scraper
+    validation >> load_markets >> run_scraper
