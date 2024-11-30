@@ -7,6 +7,8 @@ from sqlalchemy import create_engine
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql.functions import to_json, struct
 
+from minio import Minio
+
 
 # Read database configuration from the config file
 config = ConfigParser()
@@ -104,3 +106,33 @@ def write_to_kafka(df, kafka_bootstrap_servers, kafka_topic):
     except Exception as e:
         logger.error("Failed to write data to Kafka.", exc_info=True)
         raise e
+    
+
+
+#****************************************************************************************************
+#*                                              MinIO                                               *
+#****************************************************************************************************    
+
+
+def init_minio_client() -> Minio:
+    """
+    Initializes and returns a MinIO client instance.
+
+    Returns:
+        Minio: An instance of the Minio client.
+    """    
+    try:
+        minio_client = Minio(
+            config["Minio"]["Url"],
+            access_key=config["Minio"]["Access_Key"],
+            secret_key=config["Minio"]["Secret_Key"],
+            secure=False
+        )
+
+        return minio_client
+    
+    except Exception as e:
+        logger.error(f'Unable create MinIO client with the following error: \n{e}')
+        raise
+    
+    
