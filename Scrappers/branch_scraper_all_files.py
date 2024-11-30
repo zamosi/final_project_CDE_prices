@@ -187,12 +187,6 @@ def parse_xml_to_dataframe(root: ET.Element,path:str) -> pd.DataFrame:
         df = pd.DataFrame(data) 
         df.columns = [col.lower() for col in df.columns]
 
-        # Adjust specific columns for RTL by reversing text
-        # for col in ['ADDRESS', 'STORENAME', 'CITY']:
-        #     if col in df.columns:
-        #         df[col] = df[col].apply(
-        #             lambda x: x[::-1] if isinstance(x, str) else x)
-
         logger.info("Converted XML content to DataFrame with RTL adjustments.")
         return df
     except Exception as e:
@@ -238,15 +232,13 @@ def main():
         logger.critical(f"An error occurred with database operations: {e}")
 
     
-    try:
-        
+    try:        
         for row in df.itertuples():
             driver = setup_driver()
             USERNAME = row.user_name
             PASSWORD = row.password
             logger.info(f"start user name {USERNAME}")
 
-        
             login_to_site(driver,USERNAME,PASSWORD)
             soup = fetch_page_soup(driver)
             session = get_session_with_cookies(driver)
@@ -288,9 +280,7 @@ def main():
         logger.critical(f"An error occurred: {e}")
         sys.exit(1)
 
-
-
-    
+    # Close connections in the end of the process
     conn.close() if conn else None    
     engine.dispose() if engine else None
     logger.info('Connection closed.')
