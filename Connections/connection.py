@@ -6,6 +6,8 @@ from sqlalchemy import create_engine
 
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql.functions import to_json, struct
+from pyspark.sql.window import Window
+from pyspark.sql.functions import row_number
 
 from minio import Minio
 
@@ -93,20 +95,34 @@ def spark_read_data_from_postgres(spark: SparkSession, table_name: str) -> DataF
 #*                                              Kafka                                               *
 #****************************************************************************************************
 
-def write_to_kafka(df, kafka_bootstrap_servers, kafka_topic):
+def write_to_kafka_in_chunks(df, kafka_bootstrap_servers, kafka_topic, chunk_size):
     try:
-        # Serialize data to JSON and write to Kafka
-        (df.select(to_json(struct([df[col] for col in df.columns])).alias("value"))
-           .write
-           .format("kafka")
-           .option("kafka.bootstrap.servers", kafka_bootstrap_servers)
-           .option("topic", kafka_topic)
-           .save())
-        logger.info(f"Data successfully streamed to Kafka topic: {kafka_topic}")
+        # Add a row number column to partition the data
+        window_spec = Window.orderBy("id")  # Replace "id" with a suitable column for ordering if necessary
+        df_with_row_num = df.withColumn("row_number", row_number().over(window_spec))
+
+        # Calculate total rows
+        total_rows = df_with_row_num.count()
+        num_chunks = (total_rows // chunk_size) + (1 if total_rows % chunk_size != 0 else 0)
+
+        for i in range(num_chunks):
+            # Filter rows for the current chunk
+            start_row = i * chunk_size + 1
+            end_row = (i + 1) * chunk_size
+            chunk = df_with_row_num.filter((col("row_number") >= start_row) & (col("row_number") <= end_row)).drop("row_number")
+
+            # Serialize data to JSON and write to Kafka
+            (chunk.select(to_json(struct([chunk[col] for col in chunk.columns])).alias("value"))
+                .write
+                .format("kafka")
+                .option("kafka.bootstrap.servers", kafka_bootstrap_servers)
+                .option("topic", kafka_topic)
+                .save())
+            logger.info(f"Chunk {i + 1}/{num_chunks} successfully streamed to Kafka topic: {kafka_topic}")
+
     except Exception as e:
-        logger.error("Failed to write data to Kafka.", exc_info=True)
+        logger.error("Failed to write data to Kafka in chunks.", exc_info=True)
         raise e
-    
 
 
 #****************************************************************************************************
