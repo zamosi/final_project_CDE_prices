@@ -290,9 +290,6 @@ def main():
                 try:
                     df = download_and_parse_xml(session, file_url,file)
                     logger.info(f"DataFrame created with {len(df)} rows.")
-                    # if conn:
-                    #     insert_dataframe_to_postgres(engine, df, target_table_name)
-                    #     logger.error(f"DataFrame {i} add to DB")
 
                     # Define Parquet file path
                     source_folder = f'/home/developer/projects/spark-course-python/spark_course_python/final_project/final_project_CDE_prices/Files/Stage Data/{target_table_name}'
