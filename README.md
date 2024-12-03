@@ -17,10 +17,6 @@ A comprehensive project focused on cloud data engineering and price analytics, l
   <img src="https://www.vectorlogo.zone/logos/postgresql/postgresql-horizontal.svg" alt="PostgreSQL" height="60"> &nbsp;&nbsp;&nbsp;&nbsp;
   <!-- Amazon S3 -->
   <img src="https://www.vectorlogo.zone/logos/amazon_aws/amazon_aws-ar21.svg" alt="Amazon S3" height="60"> &nbsp;&nbsp;&nbsp;&nbsp;
-  <!-- Elasticsearch -->
-  <img src="https://www.vectorlogo.zone/logos/elastic/elastic-ar21.svg" alt="Elasticsearch" height="60"> &nbsp;&nbsp;&nbsp;&nbsp;
-  <!-- Kibana -->
-  <img src="https://www.vectorlogo.zone/logos/elasticco_kibana/elasticco_kibana-ar21.svg" alt="Kibana" height="60">
 </div>
 
 

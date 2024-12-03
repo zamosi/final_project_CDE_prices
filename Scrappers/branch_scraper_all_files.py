@@ -23,6 +23,7 @@ from webdriver_manager.chrome import ChromeDriverManager
 # Project custom Libs
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from Connections.connection import connect_to_postgres_data
+from Connections.connection import init_minio_client
 
 # Constants
 BASE_URL = 'https://url.publishedprices.co.il/file/d/'
@@ -110,9 +111,6 @@ def get_session_with_cookies(driver: webdriver.Chrome) -> requests.Session:
     Extracts cookies from the current WebDriver instance and transfers them
     to a `requests.Session` for use in making HTTP requests outside of the WebDriver.
 
-    Args:
-        driver (webdriver.Chrome): The WebDriver instance used to retrieve cookies.
-
     Returns:
         requests.Session: A `requests` session with the cookies from the WebDriver.
     """
@@ -131,9 +129,6 @@ def find_xml_links(soup: BeautifulSoup) -> list:
     Searches for tags with the specified class and filters for titles 
     that start with "Store" and end with ".xml".
 
-    Args:
-        soup (BeautifulSoup): The BeautifulSoup object containing parsed HTML content.
-
     Returns:
         list: A list of titles (links) to XML files found on the page.
     """
@@ -151,10 +146,6 @@ def download_and_parse_xml(session: requests.Session, file_url: str,file_name:st
     Uses a `requests.Session` to download and extract the gz file to xml file, decodes it with UTF-8 
     encoding, parses it into an ElementTree object, and converts it into a 
     DataFrame using `parse_xml_to_dataframe`.
-
-    Args:
-        session (requests.Session): The session used to download the XML file.
-        file_url (str): The URL of the XML file to be downloaded.
 
     Returns:
         pd.DataFrame: A pandas DataFrame containing the parsed XML data.
@@ -209,16 +200,43 @@ def insert_dataframe_to_postgres(engine, df: pd.DataFrame, table_name: str):
     is inserted into the specified table under the 'raw_data' schema. Existing
     data in the table is replaced.
 
-    Args:
-        engine: SQLAlchemy engine connected to the PostgreSQL database.
-        df (pd.DataFrame): The DataFrame to be inserted into the database.
-        table_name (str): The name of the PostgreSQL table to insert the data into.
     """
     try:
         df.to_sql(table_name, con=engine, schema='raw_data', if_exists='append', index=False)
         logger.info(f"Data inserted successfully into {table_name}.")
     except Exception as e:
         logger.error(f"Error inserting data into PostgreSQL: {e}")
+
+def append_to_parquet(new_data: pd.DataFrame, parquet_path: str):
+    """
+    Appends new data to an existing Parquet file. If the file does not exist, it creates a new one.
+    """
+    if os.path.exists(parquet_path):
+        existing_data = pd.read_parquet(parquet_path)
+        # Concatenate the new data with existing data
+        combined_data = pd.concat([existing_data, new_data], ignore_index=True)
+        # Write back to Parquet
+        combined_data.to_parquet(parquet_path, index=False)
+    else:
+        # Write new data if the file doesn't exist
+        new_data.to_parquet(parquet_path, index=False)
+        print(f"New Parquet file created at {parquet_path}.")
+
+def upload_to_minio(minio_client, bucket_name, folder_name, file_path):
+    """
+    Uploads a file to a specified folder in a MinIO bucket.
+    """
+    try:
+        # Construct the destination path in the bucket
+        file_name = os.path.basename(file_path)
+        object_name = os.path.join(folder_name, file_name)
+
+        # Upload the file
+        minio_client.fput_object(bucket_name, object_name, file_path)
+        logger.info(f"File '{file_path}' uploaded to '{bucket_name}/{object_name}'.")
+    except Exception as e:
+        logger.error(f"Failed to upload file to MinIO: {e}")
+
 
 def main():
     error_file = []
@@ -231,8 +249,16 @@ def main():
     except Exception as e:
         logger.critical(f"An error occurred with database operations: {e}")
 
-    
-    try:        
+    try:
+        # Init Minio client
+        minio_client = init_minio_client()
+        bucket_name = 'prices'
+
+        current_date = datetime.now().strftime('%Y%m%d')
+        prices_folder_name = f'prices_{current_date}'
+        snifim_folder_name = 'snifim'
+
+
         for row in df.itertuples():
             driver = setup_driver()
             USERNAME = row.user_name
@@ -258,15 +284,30 @@ def main():
                 file_url = f"{BASE_URL}{file}"
                 logger.info(f"Fetching file: {file} file{i}")
 
-                target_table_name = 'prices' if file.startswith("Price") else 'snifim'
+                target_table_name = 'Prices' if file.startswith("Price") else 'Snifim'
                 
                 #Download XML file and parse it into a DataFrame
                 try:
                     df = download_and_parse_xml(session, file_url,file)
                     logger.info(f"DataFrame created with {len(df)} rows.")
-                    if conn:
-                        insert_dataframe_to_postgres(engine, df, target_table_name)
-                        logger.error(f"DataFrame {i} add to DB")
+                    # if conn:
+                    #     insert_dataframe_to_postgres(engine, df, target_table_name)
+                    #     logger.error(f"DataFrame {i} add to DB")
+
+                    # Define Parquet file path
+                    source_folder = f'/home/developer/projects/spark-course-python/spark_course_python/final_project/final_project_CDE_prices/Files/Stage Data/{target_table_name}'
+                    parquet_file_path = os.path.join(source_folder, f"{target_table_name}.parquet")
+
+                    # Append to Parquet
+                    append_to_parquet(df, parquet_file_path)
+
+                    # Determine the MinIO folder based on file prefix
+                    dest_folder_name = "snifim" if file.startswith("Store") else f"daily_prices/{prices_folder_name}"
+                    
+                    # Upload Parquet file to MinIO
+                    upload_to_minio(minio_client, bucket_name, dest_folder_name, parquet_file_path)
+
+
                 except Exception as e:
                     logger.error(f"An error occurred when file download - {file}:{e}")
                     error_file.append(file)
@@ -281,9 +322,6 @@ def main():
         sys.exit(1)
 
     # Close connections in the end of the process
-    conn.close() if conn else None    
-    engine.dispose() if engine else None
-    logger.info('Connection closed.')
     print(error_file)
 
 
