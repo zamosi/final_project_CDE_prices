@@ -324,7 +324,7 @@ def main():
                     # Upload Parquet file to MinIO
 
                     upload_to_minio1(minio_client, target_table_name,file,df)
-                    write_df_to_kafka(df,"course-kafka:9092",'prices')
+                    write_df_to_kafka(df,"course-kafka:9092",target_table_name)
 
                 except Exception as e:
                     logger.error(f"An error occurred when file download - {file}:{e}")
