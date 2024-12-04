@@ -123,6 +123,40 @@ def write_to_kafka_in_chunks(df, kafka_bootstrap_servers, kafka_topic, chunk_siz
     except Exception as e:
         logger.error("Failed to write data to Kafka in chunks.", exc_info=True)
         raise e
+    
+
+
+def write_df_to_kafka(df,kafka_bootstrap_servers,kafka_topic):
+    try:
+        spark = SparkSession.builder \
+            .master("local") \
+            .appName("SendToKafka") \
+            .config('spark.jars.packages', 'org.apache.spark:spark-sql-kafka-0-10_2.12:3.1.2') \
+            .getOrCreate()
+
+        spark_df = spark.createDataFrame(df)
+        json_df = spark_df.select(to_json(struct([col for col in spark_df.columns])).alias("value"))
+
+        query = json_df.write \
+            .format("kafka") \
+            .option("kafka.bootstrap.servers", kafka_bootstrap_servers) \
+            .option("topic", kafka_topic) \
+            .save()
+        logger.info(f"successfully streamed to Kafka topic: {kafka_topic}")
+    except Exception as e:
+        logger.error("Failed to write data to Kafka", exc_info=True)
+        raise e
+    
+
+    
+    spark.stop()
+
+
+
+    
+
+
+
 
 
 #****************************************************************************************************

@@ -25,6 +25,19 @@ logger = logging.getLogger(__name__)
 config = ConfigParser()
 config.read("/home/developer/projects/spark-course-python/spark_course_python/final_project/final_project_CDE_prices/config/config.conf")
 
+def insert_dataframe_to_postgres(engine, df: pd.DataFrame, table_name: str):
+    """
+    Uses the SQLAlchemy engine to insert data into a PostgreSQL database. The data
+    is inserted into the specified table under the 'raw_data' schema. Existing
+    data in the table is replaced.
+
+    """
+    try:
+        df.to_sql(table_name, con=engine, schema='raw_data', if_exists='replace', index=False)
+        logger.info(f"Data inserted successfully into {table_name}.")
+    except Exception as e:
+        logger.error(f"Error inserting data into PostgreSQL: {e}")
+
 
 def check_file_exists(path:str) -> bool:
     """
@@ -89,12 +102,15 @@ def main():
         df = pd.read_excel(excel_path)
         df['run_time'] = datetime.now()
         df['password'] = df['password'].astype(str).str.strip()
+        conn, engine = connect_to_postgres_data()
+        insert_dataframe_to_postgres(engine, df, 'reshatot')
+
 
         # Append to Parquet
-        append_to_parquet(df, parquet_file_path)
+        # append_to_parquet(df, parquet_file_path)
 
-        # Upload Parquet file to MinIO
-        upload_to_minio(minio_client, bucket_name, dest_folder_name, parquet_file_path)
+        # # Upload Parquet file to MinIO
+        # upload_to_minio(minio_client, bucket_name, dest_folder_name, parquet_file_path)
     else:
         logger.critical("File doesn't exist in the given path, please set the file first in the folder!")
 

@@ -6,6 +6,7 @@ import time
 import xml.etree.ElementTree as ET
 import gzip
 from io import BytesIO
+import io
 from datetime import datetime
 import re
 
@@ -24,6 +25,7 @@ from webdriver_manager.chrome import ChromeDriverManager
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from Connections.connection import connect_to_postgres_data
 from Connections.connection import init_minio_client
+from Connections.connection import write_df_to_kafka
 
 # Constants
 BASE_URL = 'https://url.publishedprices.co.il/file/d/'
@@ -237,6 +239,24 @@ def upload_to_minio(minio_client, bucket_name, folder_name, file_path):
     except Exception as e:
         logger.error(f"Failed to upload file to MinIO: {e}")
 
+def upload_to_minio1(minio_client, bucket_name,file_name,df:pd.DataFrame):
+    """
+    Uploads a file to a specified folder in a MinIO bucket.
+    """
+    try:
+        parquet_buffer = io.BytesIO()
+        df.to_parquet(parquet_buffer, index=False)
+        parquet_buffer.seek(0)
+        # Upload the file
+        minio_client.put_object(bucket_name,file_name,parquet_buffer,len(parquet_buffer.getvalue()))
+        logger.info(f"File '{file_name}' uploaded to '{bucket_name}'.")
+    except Exception as e:
+        logger.error(f"Failed to upload file to MinIO: {e}")
+
+
+
+
+
 
 def main():
     error_file = []
@@ -252,7 +272,7 @@ def main():
     try:
         # Init Minio client
         minio_client = init_minio_client()
-        bucket_name = 'prices'
+        # bucket_name = 'prices'
 
         current_date = datetime.now().strftime('%Y%m%d')
         prices_folder_name = f'prices_{current_date}'
@@ -277,14 +297,14 @@ def main():
             
             for i,file in enumerate(xml_files):
                 
-                # if i==3:
-                #     break       
+                if i==1:
+                    break       
 
                 # Create a session with cookies to use for file download
                 file_url = f"{BASE_URL}{file}"
                 logger.info(f"Fetching file: {file} file{i}")
 
-                target_table_name = 'Prices' if file.startswith("Price") else 'Snifim'
+                target_table_name = 'prices' if file.startswith("Price") else 'snifim'
                 
                 #Download XML file and parse it into a DataFrame
                 try:
@@ -292,18 +312,19 @@ def main():
                     logger.info(f"DataFrame created with {len(df)} rows.")
 
                     # Define Parquet file path
-                    source_folder = f'/home/developer/projects/spark-course-python/spark_course_python/final_project/final_project_CDE_prices/Files/Stage Data/{target_table_name}'
-                    parquet_file_path = os.path.join(source_folder, f"{target_table_name}.parquet")
+                    # source_folder = f'/home/developer/projects/spark-course-python/spark_course_python/final_project/final_project_CDE_prices/Files/Stage Data/{target_table_name}'
+                    # parquet_file_path = os.path.join(source_folder, f"{target_table_name}.parquet")
 
                     # Append to Parquet
-                    append_to_parquet(df, parquet_file_path)
+                    # append_to_parquet(df, parquet_file_path)
 
                     # Determine the MinIO folder based on file prefix
-                    dest_folder_name = "snifim" if file.startswith("Store") else f"daily_prices/{prices_folder_name}"
+                    # dest_folder_name = "snifim" if file.startswith("Store") else f"daily_prices/{prices_folder_name}"
                     
                     # Upload Parquet file to MinIO
-                    upload_to_minio(minio_client, bucket_name, dest_folder_name, parquet_file_path)
 
+                    upload_to_minio1(minio_client, target_table_name,file,df)
+                    write_df_to_kafka(df,"course-kafka:9092",'prices')
 
                 except Exception as e:
                     logger.error(f"An error occurred when file download - {file}:{e}")
