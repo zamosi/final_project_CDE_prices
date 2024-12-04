@@ -209,37 +209,7 @@ def insert_dataframe_to_postgres(engine, df: pd.DataFrame, table_name: str):
     except Exception as e:
         logger.error(f"Error inserting data into PostgreSQL: {e}")
 
-def append_to_parquet(new_data: pd.DataFrame, parquet_path: str):
-    """
-    Appends new data to an existing Parquet file. If the file does not exist, it creates a new one.
-    """
-    if os.path.exists(parquet_path):
-        existing_data = pd.read_parquet(parquet_path)
-        # Concatenate the new data with existing data
-        combined_data = pd.concat([existing_data, new_data], ignore_index=True)
-        # Write back to Parquet
-        combined_data.to_parquet(parquet_path, index=False)
-    else:
-        # Write new data if the file doesn't exist
-        new_data.to_parquet(parquet_path, index=False)
-        print(f"New Parquet file created at {parquet_path}.")
-
-def upload_to_minio(minio_client, bucket_name, folder_name, file_path):
-    """
-    Uploads a file to a specified folder in a MinIO bucket.
-    """
-    try:
-        # Construct the destination path in the bucket
-        file_name = os.path.basename(file_path)
-        object_name = os.path.join(folder_name, file_name)
-
-        # Upload the file
-        minio_client.fput_object(bucket_name, object_name, file_path)
-        logger.info(f"File '{file_path}' uploaded to '{bucket_name}/{object_name}'.")
-    except Exception as e:
-        logger.error(f"Failed to upload file to MinIO: {e}")
-
-def upload_to_minio1(minio_client, bucket_name,file_name,df:pd.DataFrame):
+def upload_to_minio(minio_client, bucket_name,file_name,df:pd.DataFrame):
     """
     Uploads a file to a specified folder in a MinIO bucket.
     """
@@ -311,20 +281,9 @@ def main():
                     df = download_and_parse_xml(session, file_url,file)
                     logger.info(f"DataFrame created with {len(df)} rows.")
 
-                    # Define Parquet file path
-                    # source_folder = f'/home/developer/projects/spark-course-python/spark_course_python/final_project/final_project_CDE_prices/Files/Stage Data/{target_table_name}'
-                    # parquet_file_path = os.path.join(source_folder, f"{target_table_name}.parquet")
-
-                    # Append to Parquet
-                    # append_to_parquet(df, parquet_file_path)
-
-                    # Determine the MinIO folder based on file prefix
-                    # dest_folder_name = "snifim" if file.startswith("Store") else f"daily_prices/{prices_folder_name}"
-                    
-                    # Upload Parquet file to MinIO
 
                     file_n = file.replace('.gz','.parquet') if file.startswith("Price") else file.replace('.xml','.parquet')
-                    upload_to_minio1(minio_client, target_table_name,file_n,df)
+                    upload_to_minio(minio_client, target_table_name,file_n,df)
                     # write_df_to_kafka(df,"course-kafka:9092",target_table_name)
 
                 except Exception as e:
