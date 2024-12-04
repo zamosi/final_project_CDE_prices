@@ -297,8 +297,8 @@ def main():
             
             for i,file in enumerate(xml_files):
                 
-                if i==1:
-                    break       
+                # if i==1:
+                #     break       
 
                 # Create a session with cookies to use for file download
                 file_url = f"{BASE_URL}{file}"
@@ -323,8 +323,9 @@ def main():
                     
                     # Upload Parquet file to MinIO
 
-                    upload_to_minio1(minio_client, target_table_name,file,df)
-                    write_df_to_kafka(df,"course-kafka:9092",target_table_name)
+                    file_n = file.replace('.gz','.parquet') if file.startswith("Price") else file.replace('.xml','.parquet')
+                    upload_to_minio1(minio_client, target_table_name,file_n,df)
+                    # write_df_to_kafka(df,"course-kafka:9092",target_table_name)
 
                 except Exception as e:
                     logger.error(f"An error occurred when file download - {file}:{e}")
