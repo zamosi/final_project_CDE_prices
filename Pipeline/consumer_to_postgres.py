@@ -10,6 +10,7 @@ from pyspark.sql import types as T
 
 # Project custom Libs
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+from Connections.connection import  spark_consumer_to_df,spark_write_data_to_postgres
 
 # Load database configuration
 config = ConfigParser()
@@ -19,19 +20,10 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s"
 )
+
 logger = logging.getLogger(__name__)
 
-
-
-spark = SparkSession \
- .builder \
- .master("local") \
- .appName('consumer_1') \
- .config('spark.jars.packages', 'org.apache.spark:spark-sql-kafka-0-10_2.12:3.1.2') \
- .getOrCreate()
-
-# df = spark.read.parquet("s3a://prices/Price7290058140886-001-202412040800.parquet")
-# df.printSchema()
+topic= 'prices'
 
 prices_schema = T.StructType([T.StructField('priceupdatedate',T.StringType(),True),
                             T.StructField('itemcode',T.StringType(),True),
@@ -58,36 +50,18 @@ prices_schema = T.StructType([T.StructField('priceupdatedate',T.StringType(),Tru
                             ])
 
 
-df=spark.readStream \
-    .format("parquet") \
-    .schema(prices_schema)\
-    .load("s3a://prices/*.parquet") 
-
-df_with_kafka_format = df.selectExpr("to_json(struct(*)) AS value")
-
-
-query = df_with_kafka_format.writeStream \
-    .format("kafka") \
-    .option("kafka.bootstrap.servers", "course-kafka:9092") \
-    .option("topic", "prices") \
-    .option("checkpointLocation", "s3a://spark/checkpoints/prices") \
-    .outputMode("append") \
-    .start()
-
-query.awaitTermination()
+spark = SparkSession \
+.builder \
+.master("local") \
+.appName('consumer_prices') \
+.config('spark.jars.packages', 'org.apache.spark:spark-sql-kafka-0-10_2.12:3.1.2') \
+.getOrCreate()
 
 
 
 
-spark.stop()
-
-
-
-
-
-
-
-
+df = spark_consumer_to_df(spark,topic,prices_schema)
+spark_write_data_to_postgres(spark,'raw_data.prices_n',df)
 
 
 

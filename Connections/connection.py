@@ -8,6 +8,8 @@ from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql.functions import to_json, struct
 from pyspark.sql.window import Window
 from pyspark.sql.functions import row_number
+from pyspark.sql import functions as F
+from pyspark.sql import types as T
 
 from minio import Minio
 from minio.error import S3Error
@@ -93,6 +95,27 @@ def spark_read_data_from_postgres(spark: SparkSession, table_name: str) -> DataF
     return df
 
 
+def spark_write_data_to_postgres(spark: SparkSession, table_name: str,df):
+
+    jdbc_url = f"jdbc:postgresql://{config['Postgres_Data']['HOST']}:{config['Postgres_Data']['PORT']}/{config['Postgres_Data']['DB']}"
+
+    postgres_options  = {
+        "user": config["Postgres_Data"]["USER"],
+        "password": config["Postgres_Data"]["PASSWORD"],
+        "driver": "org.postgresql.Driver",
+        "dbtable":table_name,
+        "url": jdbc_url
+        }
+
+    query = df.writeStream \
+        .foreachBatch(lambda batch_df, _: batch_df.write \
+                    .jdbc(url=postgres_options["url"], table=postgres_options["dbtable"], mode="append", properties=postgres_options)) \
+        .outputMode("append") \
+        .start()
+
+    query.awaitTermination()
+
+
 #****************************************************************************************************
 #*                                              Kafka                                               *
 #****************************************************************************************************
@@ -127,35 +150,46 @@ def write_to_kafka_in_chunks(df, kafka_bootstrap_servers, kafka_topic, chunk_siz
         raise e
     
 
+def spark_consumer_to_df(spark: SparkSession,topic:str,schema):
 
-def write_df_to_kafka(df,kafka_bootstrap_servers,kafka_topic):
-    try:
-        spark = SparkSession.builder \
-            .master("local") \
-            .appName("SendToKafka") \
-            .config('spark.jars.packages', 'org.apache.spark:spark-sql-kafka-0-10_2.12:3.1.2') \
-            .getOrCreate()
-
-        spark_df = spark.createDataFrame(df)
-        json_df = spark_df.select(to_json(struct([col for col in spark_df.columns])).alias("value"))
-
-        query = json_df.write \
-            .format("kafka") \
-            .option("kafka.bootstrap.servers", kafka_bootstrap_servers) \
-            .option("topic", kafka_topic) \
-            .save()
-        logger.info(f"successfully streamed to Kafka topic: {kafka_topic}")
-    except Exception as e:
-        logger.error("Failed to write data to Kafka", exc_info=True)
-        raise e
-    
-
-    
-    spark.stop()
+    stream_df = spark \
+    .readStream \
+    .format('kafka') \
+    .option("kafka.bootstrap.servers", "course-kafka:9092") \
+    .option("subscribe", topic) \
+    .option('startingOffsets', 'latest') \
+    .option("failOnDataLoss", "false") \
+    .load() \
+    .select(F.col('value').cast(T.StringType()))
 
 
+    parsed_df = stream_df \
+    .withColumn('parsed_json', F.from_json(F.col('value'), schema)) \
+    .select(F.col('parsed_json.*'))
 
-    
+
+    return parsed_df 
+
+def procuder_minio_to_kafka(spark:SparkSession,topic,schema):
+
+    df_stream = spark.readStream \
+        .format("parquet") \
+        .schema(schema)\
+        .option("path", f"s3a://{topic}/") \
+        .load()
+
+    json_df = df_stream.select(F.to_json(F.struct([col for col in df_stream.columns])).alias("value"))
+
+    query = json_df.writeStream \
+        .format("kafka") \
+        .option("kafka.bootstrap.servers", "course-kafka:9092") \
+        .option("topic", topic) \
+        .outputMode("update") \
+        .option("checkpointLocation", f"s3a://spark/{topic}/checkpoints/") \
+        .start()
+
+    query.awaitTermination()
+
 
 
 

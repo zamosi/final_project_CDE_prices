@@ -25,7 +25,7 @@ from webdriver_manager.chrome import ChromeDriverManager
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from Connections.connection import connect_to_postgres_data
 from Connections.connection import init_minio_client
-from Connections.connection import write_df_to_kafka
+
 
 # Constants
 BASE_URL = 'https://url.publishedprices.co.il/file/d/'
@@ -274,8 +274,8 @@ def main():
             
             for i,file in enumerate(xml_files):
                 
-                if i==1:
-                    break       
+                # if i==1:
+                #     break       
 
                 # Create a session with cookies to use for file download
                 file_url = f"{BASE_URL}{file}"
@@ -293,7 +293,8 @@ def main():
                         df = download_and_parse_xml(session, file_url,file)
                         logger.info(f"DataFrame created with {len(df)} rows.")
                         upload_to_minio(minio_client, target_table_name,file_n,df)
-                        write_df_to_kafka(df,"course-kafka:9092",target_table_name)
+                        # write_df_to_kafka(df,"course-kafka:9092",target_table_name)
+                        # write_df_to_kafka_stream(df,"course-kafka:9092",target_table_name)
 
                 except Exception as e:
                     logger.error(f"An error occurred when file download - {file}:{e}")
