@@ -209,9 +209,19 @@ def insert_dataframe_to_postgres(engine, df: pd.DataFrame, table_name: str):
     except Exception as e:
         logger.error(f"Error inserting data into PostgreSQL: {e}")
 
+def check_if_file_exists(minio_client,bucket_name,file_name):
+    """
+    Check in file exist in a MinIO bucket .
+    """
+    try:
+        minio_client.stat_object(bucket_name, file_name)
+        return True  
+    except Exception as e:
+        return False    
+
 def upload_to_minio(minio_client, bucket_name,file_name,df:pd.DataFrame):
     """
-    Uploads a file to a specified folder in a MinIO bucket.
+    Uploads a file to a specified folder in a MinIO bucket .
     """
     try:
         parquet_buffer = io.BytesIO()
@@ -222,9 +232,6 @@ def upload_to_minio(minio_client, bucket_name,file_name,df:pd.DataFrame):
         logger.info(f"File '{file_name}' uploaded to '{bucket_name}'.")
     except Exception as e:
         logger.error(f"Failed to upload file to MinIO: {e}")
-
-
-
 
 
 
@@ -267,8 +274,8 @@ def main():
             
             for i,file in enumerate(xml_files):
                 
-                # if i==1:
-                #     break       
+                if i==1:
+                    break       
 
                 # Create a session with cookies to use for file download
                 file_url = f"{BASE_URL}{file}"
@@ -278,13 +285,15 @@ def main():
                 
                 #Download XML file and parse it into a DataFrame
                 try:
-                    df = download_and_parse_xml(session, file_url,file)
-                    logger.info(f"DataFrame created with {len(df)} rows.")
-
-
                     file_n = file.replace('.gz','.parquet') if file.startswith("Price") else file.replace('.xml','.parquet')
-                    upload_to_minio(minio_client, target_table_name,file_n,df)
-                    # write_df_to_kafka(df,"course-kafka:9092",target_table_name)
+
+                    if check_if_file_exists(minio_client, target_table_name,file_n):
+                        logger.info(f"The file '{file_n}' exists in bucket '{target_table_name}'.")
+                    else:
+                        df = download_and_parse_xml(session, file_url,file)
+                        logger.info(f"DataFrame created with {len(df)} rows.")
+                        upload_to_minio(minio_client, target_table_name,file_n,df)
+                        write_df_to_kafka(df,"course-kafka:9092",target_table_name)
 
                 except Exception as e:
                     logger.error(f"An error occurred when file download - {file}:{e}")

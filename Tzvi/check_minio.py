@@ -8,6 +8,7 @@ import gzip
 from io import BytesIO
 from datetime import datetime
 import re
+from minio.error import S3Error
 
 
 # Third-Party Libraries
@@ -30,6 +31,14 @@ from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
 from pyspark.sql import types as T
 
+
+
+# Set up Logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s"
+)
+logger = logging.getLogger(__name__)
 # spark = SparkSession.builder \
 #     .master("local") \
 #     .appName('load_from_minio') \
@@ -38,21 +47,27 @@ from pyspark.sql import types as T
 #     .config("spark.fs.s3a.endpoint", "http://minio:9000") \
 #     .config("spark.fs.s3a.path.style.access", "true") \
 #     .config("spark.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem") \
-#     .getOrCreate()
-spark = SparkSession \
- .builder \
- .master("local") \
- .appName('load_from_minio_to_kafka') \
- .config('spark.jars.packages', 'org.apache.spark:spark-sql-kafka-0-10_2.12:3.1.2') \
- .getOrCreate()
+# #     .getOrCreate()
+# spark = SparkSession \
+#  .builder \
+#  .master("local") \
+#  .appName('load_from_minio_to_kafka') \
+#  .config('spark.jars.packages', 'org.apache.spark:spark-sql-kafka-0-10_2.12:3.1.2') \
+#  .getOrCreate()
 
 
-df = spark.read.parquet('s3a://prices/Price7290644700005-6109-202408191600.gz')
-df.show(20)
+# df = spark.read.parquet('s3a://prices/Price7290644700005-6109-202408191600.gz')
+# df.show(20)
 
-spark.stop()
-
-
+# spark.stop()
+minio_client = init_minio_client()
+bucket_name = 'prices'
+file_name = 'Price7290058140886-001-202412040800.parquet'
+try:
+    if minio_client.stat_object(bucket_name, file_name):
+        print('aaa')
+except Exception as e:
+    logger.error(f"Failed to upload file to MinIO: {e}")
 
 
 

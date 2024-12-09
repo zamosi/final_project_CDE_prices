@@ -10,6 +10,8 @@ from pyspark.sql.window import Window
 from pyspark.sql.functions import row_number
 
 from minio import Minio
+from minio.error import S3Error
+
 
 
 # Read database configuration from the config file
