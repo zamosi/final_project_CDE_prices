@@ -66,12 +66,6 @@ def spark_read_data_from_postgres(spark: SparkSession, table_name: str) -> DataF
     """
     Read data from a PostgreSQL table into a PySpark DataFrame.
 
-    Args:
-        spark (SparkSession): SparkSession object.
-        jdbc_url (str): JDBC URL for the PostgreSQL database.
-        database_properties (dict): Dictionary with user, password, and driver info.
-        table_name (str): Name of the PostgreSQL table to read.
-
     Returns:
         DataFrame: PySpark DataFrame containing the table data.
     """
@@ -120,36 +114,6 @@ def spark_write_data_to_postgres(spark: SparkSession, table_name: str,df):
 #*                                              Kafka                                               *
 #****************************************************************************************************
 
-def write_to_kafka_in_chunks(df, kafka_bootstrap_servers, kafka_topic, chunk_size):
-    try:
-        # Add a row number column to partition the data
-        window_spec = Window.orderBy("id")  # Replace "id" with a suitable column for ordering if necessary
-        df_with_row_num = df.withColumn("row_number", row_number().over(window_spec))
-
-        # Calculate total rows
-        total_rows = df_with_row_num.count()
-        num_chunks = (total_rows // chunk_size) + (1 if total_rows % chunk_size != 0 else 0)
-
-        for i in range(num_chunks):
-            # Filter rows for the current chunk
-            start_row = i * chunk_size + 1
-            end_row = (i + 1) * chunk_size
-            chunk = df_with_row_num.filter((col("row_number") >= start_row) & (col("row_number") <= end_row)).drop("row_number")
-
-            # Serialize data to JSON and write to Kafka
-            (chunk.select(to_json(struct([chunk[col] for col in chunk.columns])).alias("value"))
-                .write
-                .format("kafka")
-                .option("kafka.bootstrap.servers", kafka_bootstrap_servers)
-                .option("topic", kafka_topic)
-                .save())
-            logger.info(f"Chunk {i + 1}/{num_chunks} successfully streamed to Kafka topic: {kafka_topic}")
-
-    except Exception as e:
-        logger.error("Failed to write data to Kafka in chunks.", exc_info=True)
-        raise e
-    
-
 def spark_consumer_to_df(spark: SparkSession,topic:str,schema):
 
     stream_df = spark \
@@ -162,21 +126,27 @@ def spark_consumer_to_df(spark: SparkSession,topic:str,schema):
     .load() \
     .select(F.col('value').cast(T.StringType()))
 
-
     parsed_df = stream_df \
     .withColumn('parsed_json', F.from_json(F.col('value'), schema)) \
     .select(F.col('parsed_json.*'))
 
-
     return parsed_df 
 
 def procuder_minio_to_kafka(spark:SparkSession,topic,schema):
+    
+    # Set MinIO credentials and endpoint
+    spark.conf.set("fs.s3a.endpoint", "http://minio:9000")
+    spark.conf.set("fs.s3a.access.key", "minioadmin")
+    spark.conf.set("fs.s3a.secret.key", "minioadmin")
+    spark.conf.set("fs.s3a.path.style.access", "true")
 
     df_stream = spark.readStream \
         .format("parquet") \
         .schema(schema)\
         .option("path", f"s3a://{topic}/") \
         .load()
+    
+    logger.info("spark read-stream created.")
 
     json_df = df_stream.select(F.to_json(F.struct([col for col in df_stream.columns])).alias("value"))
 
@@ -189,10 +159,7 @@ def procuder_minio_to_kafka(spark:SparkSession,topic,schema):
         .start()
 
     query.awaitTermination()
-
-
-
-
+    logger.info("Transfer data to kafka - completed.")
 
 
 #****************************************************************************************************

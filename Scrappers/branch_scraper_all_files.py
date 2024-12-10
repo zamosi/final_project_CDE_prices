@@ -273,10 +273,6 @@ def main():
                 continue
             
             for i,file in enumerate(xml_files):
-                
-                # if i==1:
-                #     break       
-
                 # Create a session with cookies to use for file download
                 file_url = f"{BASE_URL}{file}"
                 logger.info(f"Fetching file: {file} file{i}")
@@ -293,8 +289,6 @@ def main():
                         df = download_and_parse_xml(session, file_url,file)
                         logger.info(f"DataFrame created with {len(df)} rows.")
                         upload_to_minio(minio_client, target_table_name,file_n,df)
-                        # write_df_to_kafka(df,"course-kafka:9092",target_table_name)
-                        # write_df_to_kafka_stream(df,"course-kafka:9092",target_table_name)
 
                 except Exception as e:
                     logger.error(f"An error occurred when file download - {file}:{e}")
@@ -311,7 +305,6 @@ def main():
 
     # Close connections in the end of the process
     print(error_file)
-
 
 
 if __name__ == "__main__":

@@ -47,7 +47,7 @@ with DAG(
         task_id='run_branch_scraper',
         ssh_conn_id='ssh_default',
         command='python3 /home/developer/projects/spark-course-python/spark_course_python/final_project/final_project_CDE_prices/Scrappers/branch_scraper_all_files.py'
-    )
+    )  
 
     # Steps of the DAG
     validation >> load_markets >> run_scraper
