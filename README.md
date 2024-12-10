@@ -26,7 +26,8 @@ A comprehensive project focused on cloud data engineering and price analytics, l
     <img src="https://www.vectorlogo.zone/logos/linux/linux-ar21.svg" alt="Linux" height="60">
     &nbsp;&nbsp;&nbsp;&nbsp;
     <!-- Trino -->
-    <img src="https://www.vectorlogo.zone/logos/trinodb/trinodb-ar21.svg" alt="Trino" height="60">
+    <img src="https://commons.wikimedia.org/wiki/File:Trino-logo-w-bk.svg" alt="Trino" height="60">
+
 </div>
 
 
