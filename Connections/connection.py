@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime
 
 from psycopg2 import connect
 from configparser import ConfigParser
@@ -67,8 +68,8 @@ def spark_read_data_from_postgres(spark: SparkSession, table_name: str) -> DataF
     Returns:
         DataFrame: PySpark DataFrame containing the table data.
     """
-    # JDBC connection string
-    jdbc_url = f"jdbc:postgresql://{config['Postgres_Data']['HOST']}:{config['Postgres_Data']['PORT']}/{config['Postgres_Data']['DB']}"
+    # JDBC connection string with UTF-8 encoding
+    jdbc_url = f"jdbc:postgresql://{config['Postgres_Data']['HOST']}:{config['Postgres_Data']['PORT']}/{config['Postgres_Data']['DB']}?stringtype=unspecified&characterEncoding=UTF-8"
     
     database_properties = {
         "user": config["Postgres_Data"]["USER"],
@@ -83,8 +84,11 @@ def spark_read_data_from_postgres(spark: SparkSession, table_name: str) -> DataF
         .option("user", database_properties["user"]) \
         .option("password", database_properties["password"]) \
         .option("driver", database_properties["driver"]) \
+        .option("characterEncoding", "UTF-8") \
         .load()
+
     return df
+
 
 
 def spark_write_data_to_postgres(spark: SparkSession, table_name: str,df):
@@ -113,7 +117,6 @@ def spark_write_data_to_postgres(spark: SparkSession, table_name: str,df):
 #****************************************************************************************************
 
 def spark_consumer_to_df(spark: SparkSession,topic:str,schema):
-
     stream_df = spark \
         .readStream \
         .format('kafka') \
@@ -132,7 +135,6 @@ def spark_consumer_to_df(spark: SparkSession,topic:str,schema):
 
 
 def procuder_minio_to_kafka(spark:SparkSession,topic,schema):
-    
     # Set MinIO credentials and endpoint
     spark.conf.set("fs.s3a.endpoint", config["Minio"]["HTTP_Url"])
     spark.conf.set("fs.s3a.access.key", config["Minio"]["Access_Key"])
@@ -187,4 +189,25 @@ def init_minio_client() -> Minio:
         logger.error(f'Unable create MinIO client with the following error: \n{e}')
         raise
     
-    
+
+def spark_write_data_to_bucket(df: DataFrame, bucket_name:str):
+    """
+    Writes the DataFrame as Parquet files to the MinIO bucket with file naming convention ml_yyyymmdd.
+    """
+    try:
+        # Generate the dynamic output path with the desired file name format
+        date_str = datetime.now().strftime("%Y%m%d")
+        output_path = f"s3a://{bucket_name}/ml_{date_str}"
+
+        query = df.writeStream \
+            .outputMode("append") \
+            .format("parquet") \
+            .option("path", output_path) \
+            .option("checkpointLocation", f"s3a://spark/ML/checkpoints/") \
+            .start()
+
+        query.awaitTermination()
+
+    except Exception as e:
+        logger.error(f"Error writing Parquet files to bucket: {e}")
+        raise   
