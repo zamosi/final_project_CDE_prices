@@ -105,6 +105,15 @@ def main():
         # Add the 'days_since_last_price_update' column
         df = df.withColumn("days_since_last_price_update", F.datediff(F.col("file_date"), F.col("priceupdatedate")))
 
+        # Add the 'days_since_last_price_update' column
+        df = df.withColumn("days_since_last_price_update", F.datediff(F.col("file_date"), F.col("priceupdatedate")))
+
+        # Add the 'is_price_update_stale' column based on days_since_last_price_update > 60
+        df = df.withColumn(
+            "is_price_update_stale", 
+            F.when(F.col("days_since_last_price_update") > 60, 1).otherwise(0)
+        )        
+
         # Drop duplicate colum from enriched df
         df = df.drop("reshet_num") 
 

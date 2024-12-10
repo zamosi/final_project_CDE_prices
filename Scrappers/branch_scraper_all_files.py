@@ -225,7 +225,7 @@ def upload_to_minio(minio_client, bucket_name,file_name,df:pd.DataFrame):
     """
     try:
         parquet_buffer = io.BytesIO()
-        df.to_parquet(parquet_buffer, index=False)
+        df.to_parquet(parquet_buffer, index=False, compression='snappy')
         parquet_buffer.seek(0)
         # Upload the file
         minio_client.put_object(bucket_name,file_name,parquet_buffer,len(parquet_buffer.getvalue()))
