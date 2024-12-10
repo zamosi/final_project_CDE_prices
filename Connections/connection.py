@@ -12,8 +12,6 @@ from pyspark.sql import functions as F
 from pyspark.sql import types as T
 
 from minio import Minio
-from minio.error import S3Error
-
 
 
 # Read database configuration from the config file
@@ -117,27 +115,28 @@ def spark_write_data_to_postgres(spark: SparkSession, table_name: str,df):
 def spark_consumer_to_df(spark: SparkSession,topic:str,schema):
 
     stream_df = spark \
-    .readStream \
-    .format('kafka') \
-    .option("kafka.bootstrap.servers", "course-kafka:9092") \
-    .option("subscribe", topic) \
-    .option('startingOffsets', 'latest') \
-    .option("failOnDataLoss", "false") \
-    .load() \
-    .select(F.col('value').cast(T.StringType()))
+        .readStream \
+        .format('kafka') \
+        .option("kafka.bootstrap.servers", config["Kafka"]["KAFKA_BOOTSTRAP_SERVERS"]) \
+        .option("subscribe", topic) \
+        .option('startingOffsets', 'latest') \
+        .option("failOnDataLoss", "false") \
+        .load() \
+        .select(F.col('value').cast(T.StringType()))
 
     parsed_df = stream_df \
-    .withColumn('parsed_json', F.from_json(F.col('value'), schema)) \
-    .select(F.col('parsed_json.*'))
+        .withColumn('parsed_json', F.from_json(F.col('value'), schema)) \
+        .select(F.col('parsed_json.*'))
 
     return parsed_df 
+
 
 def procuder_minio_to_kafka(spark:SparkSession,topic,schema):
     
     # Set MinIO credentials and endpoint
-    spark.conf.set("fs.s3a.endpoint", "http://minio:9000")
-    spark.conf.set("fs.s3a.access.key", "minioadmin")
-    spark.conf.set("fs.s3a.secret.key", "minioadmin")
+    spark.conf.set("fs.s3a.endpoint", config["Minio"]["HTTP_Url"])
+    spark.conf.set("fs.s3a.access.key", config["Minio"]["Access_Key"])
+    spark.conf.set("fs.s3a.secret.key", config["Minio"]["Secret_Key"])
     spark.conf.set("fs.s3a.path.style.access", "true")
 
     df_stream = spark.readStream \
@@ -152,7 +151,7 @@ def procuder_minio_to_kafka(spark:SparkSession,topic,schema):
 
     query = json_df.writeStream \
         .format("kafka") \
-        .option("kafka.bootstrap.servers", "course-kafka:9092") \
+        .option("kafka.bootstrap.servers", config["Kafka"]["KAFKA_BOOTSTRAP_SERVERS"]) \
         .option("topic", topic) \
         .outputMode("update") \
         .option("checkpointLocation", f"s3a://spark/{topic}/checkpoints/") \
