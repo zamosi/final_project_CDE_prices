@@ -49,21 +49,18 @@ prices_schema = T.StructType([T.StructField('priceupdatedate',T.StringType(),Tru
                             T.StructField('run_time',T.TimestampType(),True)
                             ])
 
+try:
+    spark = SparkSession \
+        .builder \
+        .master("local") \
+        .appName('consumer_prices') \
+        .config('spark.jars.packages', config["Kafka"]["KAFKA_JAR"]) \
+        .config("spark.jars", config["Core_Settings"]["POSTGRES_JDBC_DRIVERS_PATH"])\
+        .getOrCreate() 
 
-spark = SparkSession \
-.builder \
-.master("local") \
-.appName('consumer_prices') \
-.config('spark.jars.packages', 'org.apache.spark:spark-sql-kafka-0-10_2.12:3.1.2') \
-.getOrCreate()
+    df = spark_consumer_to_df(spark,topic,prices_schema)
+    spark_write_data_to_postgres(spark,'raw_data.prices_n',df)
 
-
-
-
-df = spark_consumer_to_df(spark,topic,prices_schema)
-spark_write_data_to_postgres(spark,'raw_data.prices_n',df)
-
-
-
-
-
+except Exception as e:
+    logger.error(e)
+    sys.exit(1)
