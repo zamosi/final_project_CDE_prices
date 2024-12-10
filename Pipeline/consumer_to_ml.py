@@ -61,6 +61,12 @@ def main():
             .config("spark.jars", config["Core_Settings"]["POSTGRES_JDBC_DRIVERS_PATH"])\
             .getOrCreate() 
         
+        # Set MinIO credentials and endpoint
+        spark.conf.set("fs.s3a.endpoint", config["Minio"]["HTTP_Url"])
+        spark.conf.set("fs.s3a.access.key", config["Minio"]["Access_Key"])
+        spark.conf.set("fs.s3a.secret.key", config["Minio"]["Secret_Key"])
+        spark.conf.set("fs.s3a.path.style.access", "true")
+        
         logger.info('Spark session created')
 
         # read stream
