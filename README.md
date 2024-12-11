@@ -8,7 +8,7 @@
   <li><strong>Data Storage:</strong> Stores scraped data in a MinIO bucket, making it accessible to analysts via Trino and Hive Metastore.</li>
   <li><strong>Data Streaming:</strong> 
     <ul>
-      <li>Publishes data to Kafka streams, enabling real-time providers and consumers to process new data related to stores and prices.</li>
+      <li>Publishes data to Kafka streams, enabling providers and consumers to process new data related to stores and prices.</li>
     </ul>
   </li>
   <li><strong>Data Consumption:</strong>
