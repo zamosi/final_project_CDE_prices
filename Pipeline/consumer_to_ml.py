@@ -124,7 +124,7 @@ def main():
         df = df.drop("reshet_num") 
 
         # Write Parquet file to the specified bucket
-        spark_write_data_to_bucket(df, 'testbucket')
+        spark_write_data_to_bucket(df, 'ml-bucket')
 
         spark.stop()
 

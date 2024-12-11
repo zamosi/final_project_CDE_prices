@@ -27,6 +27,13 @@ with DAG(
     tags=['kafka', 'consumer', 'postgres']
 ) as dag:
 
+    check_topics = SSHOperator(
+        task_id='check_topics',
+        ssh_conn_id='ssh_default',
+        command='python3 /home/developer/projects/spark-course-python/spark_course_python/final_project/final_project_CDE_prices/Tests/check_topics.py'
+    )
+
+
     # Task to validate the schema in the database by executing a Python script over SSH
     postgres_consumer = SSHOperator(
         task_id='postgres_consumer',
@@ -35,4 +42,4 @@ with DAG(
     )
 
     # Steps of the DAG
-    postgres_consumer
+    check_topics >> postgres_consumer

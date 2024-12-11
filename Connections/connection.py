@@ -1,5 +1,6 @@
 import logging
 from datetime import datetime
+import uuid
 
 from psycopg2 import connect
 from configparser import ConfigParser
@@ -156,7 +157,7 @@ def procuder_minio_to_kafka(spark:SparkSession,topic,schema):
         .option("kafka.bootstrap.servers", config["Kafka"]["KAFKA_BOOTSTRAP_SERVERS"]) \
         .option("topic", topic) \
         .outputMode("update") \
-        .option("checkpointLocation", f"s3a://spark/{topic}/checkpoints/") \
+        .option("checkpointLocation", f"s3a://spark/{topic}/checkpoints/sources/{uuid.uuid4()}") \
         .start()
 
     query.awaitTermination()
@@ -203,7 +204,7 @@ def spark_write_data_to_bucket(df: DataFrame, bucket_name:str):
             .outputMode("append") \
             .format("parquet") \
             .option("path", output_path) \
-            .option("checkpointLocation", f"s3a://spark/ML/checkpoints/") \
+            .option("checkpointLocation", f"s3a://spark/ML/checkpoints/sources/{uuid.uuid4()}") \
             .start()
 
         query.awaitTermination()
