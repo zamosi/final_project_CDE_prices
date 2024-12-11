@@ -3,7 +3,6 @@
 ## 📘 Description
 A comprehensive project focused on cloud data engineering and price analytics, leveraging modern tools and technologies for efficient data processing and insights.
 
-
 ## 🛠️ Tech Stack
 
 <div align="center">
@@ -27,10 +26,13 @@ A comprehensive project focused on cloud data engineering and price analytics, l
     &nbsp;&nbsp;&nbsp;&nbsp;
     <!-- Trino -->
     <img src="https://upload.wikimedia.org/wikipedia/commons/5/57/Trino-logo-w-bk.svg" alt="Trino" height="60">
-
 </div>
 
+## 🏗️ Architecture
 
+<div align="center">
+    <img src="https://i.imgur.com/aAN7hIs.png" alt="Architecture Diagram" width="500">
+</div>
 
 ## 👥 Authors
 
