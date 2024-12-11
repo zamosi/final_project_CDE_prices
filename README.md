@@ -31,7 +31,7 @@ A comprehensive project focused on cloud data engineering and price analytics, l
 ## 🏗️ Architecture
 
 <div align="center">
-    <img src="https://i.imgur.com/aAN7hIs.png" alt="Architecture Diagram" width="500">
+    <img src="https://i.imgur.com/aAN7hIs.png" alt="Architecture Diagram" width="850">
 </div>
 
 ## 👥 Authors
