@@ -52,7 +52,7 @@
 ## 🏗️ Architecture
 
 <div align="center">
-    <img src="https://i.imgur.com/aAN7hIs.png" alt="Architecture Diagram" width="850">
+    <img src="https://i.imgur.com/jsFEOsW.png" alt="Architecture Diagram" width="850">
 </div>
 
 ## 👥 Authors
