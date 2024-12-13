@@ -1,5 +1,6 @@
 CREATE SCHEMA RAW_DATA;
 
+
 CREATE TABLE RAW_DATA.SNIFIM (
     storeid INT,
     bikoretno INT,
@@ -39,6 +40,34 @@ CREATE TABLE RAW_DATA.PRICES (
     run_time TIMESTAMP NULL
 );
 
+CREATE TABLE RAW_DATA.PRICES_N (
+    priceupdatedate VARCHAR(100),
+    itemcode VARCHAR(100),
+    itemtype VARCHAR(100),
+    itemname VARCHAR(255),
+    manufacturername VARCHAR(100),
+    manufacturecountry VARCHAR(100),
+    manufactureritemdescription VARCHAR(255),
+    unitqty VARCHAR(50),
+    quantity VARCHAR(100),
+    unitofmeasure VARCHAR(50),
+    bisweighted VARCHAR(100),
+    qtyinpackage VARCHAR(100),
+    itemprice VARCHAR(100),
+    unitofmeasureprice VARCHAR(100),
+    allowdiscount VARCHAR(100),
+    itemstatus VARCHAR(100),
+    itemid VARCHAR(100),
+    file_name VARCHAR(255),
+    num_reshet VARCHAR(100),
+    num_snif VARCHAR(100),
+    file_date TIMESTAMP,
+    run_time TIMESTAMP
+);
+
+
+
+
 CREATE TABLE RAW_DATA.RESHATOT (
     reshet_name VARCHAR(255),
     reshet_num BIGINT,
@@ -46,4 +75,18 @@ CREATE TABLE RAW_DATA.RESHATOT (
     user_name VARCHAR(100),
     password VARCHAR(255),
     run_time TIMESTAMP
+);
+
+
+CREATE SCHEMA dwh;
+
+CREATE TABLE dwh.prices_scd (
+    itemcode BIGINT,
+    itemname VARCHAR(255),
+    itemprice FLOAT,
+    StartDate DATE,
+    EndDate DATE,
+    IsActive INT,
+    reshet_num BIGINT,
+    snif_num INT
 );

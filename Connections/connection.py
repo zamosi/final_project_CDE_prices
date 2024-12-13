@@ -1,6 +1,5 @@
 import logging
 from datetime import datetime
-import uuid
 
 from psycopg2 import connect
 from configparser import ConfigParser
@@ -61,6 +60,18 @@ def connect_to_postgres_data():
         logger.error(f"An error occurred: {e}")
         return None
 
+def truncate_table_in_postgres(conn,table_name):
+
+    try:
+        cursor = conn.cursor()
+        truncate_query = f"TRUNCATE TABLE {table_name}"
+        cursor.execute(truncate_query)
+        conn.commit() 
+        logger.info(f"Table {table_name} truncated successfully.")
+    except Exception as e:
+        logger.error(f"Error occurred while truncating table: {e}")
+    finally:
+        cursor.close()
 
 def spark_read_data_from_postgres(spark: SparkSession, table_name: str) -> DataFrame:
     """
@@ -91,7 +102,6 @@ def spark_read_data_from_postgres(spark: SparkSession, table_name: str) -> DataF
     return df
 
 
-
 def spark_write_data_to_postgres(spark: SparkSession, table_name: str,df):
 
     jdbc_url = f"jdbc:postgresql://{config['Postgres_Data']['HOST']}:{config['Postgres_Data']['PORT']}/{config['Postgres_Data']['DB']}"
@@ -111,6 +121,8 @@ def spark_write_data_to_postgres(spark: SparkSession, table_name: str,df):
         .start()
 
     query.awaitTermination()
+
+
 
 
 #****************************************************************************************************
@@ -157,7 +169,7 @@ def procuder_minio_to_kafka(spark:SparkSession,topic,schema):
         .option("kafka.bootstrap.servers", config["Kafka"]["KAFKA_BOOTSTRAP_SERVERS"]) \
         .option("topic", topic) \
         .outputMode("update") \
-        .option("checkpointLocation", f"s3a://spark/{topic}/checkpoints/sources/{uuid.uuid4()}") \
+        .option("checkpointLocation", f"s3a://spark/{topic}/checkpoints/") \
         .start()
 
     query.awaitTermination()
@@ -204,7 +216,7 @@ def spark_write_data_to_bucket(df: DataFrame, bucket_name:str):
             .outputMode("append") \
             .format("parquet") \
             .option("path", output_path) \
-            .option("checkpointLocation", f"s3a://spark/ML/checkpoints/sources/{uuid.uuid4()}") \
+            .option("checkpointLocation", f"s3a://spark/ML/checkpoints/") \
             .start()
 
         query.awaitTermination()
