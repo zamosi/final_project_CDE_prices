@@ -1,7 +1,7 @@
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
 from pyspark.sql import types as T
-
+from pyspark.sql.window import Window
 # יצירת SparkSession
 spark = SparkSession.builder.master("local").appName("SCD Type 2").getOrCreate()
 
@@ -13,7 +13,7 @@ df_old = spark.createDataFrame(
     (2, "Product B", 20, "2024-01-01", None, 1,1,1),
     (4, "Product D", 30, "2024-01-01", None, 1,1,1)
 ], 
-["itemcode", "itemname", "itemprice", "StartDate", "EndDate", "IsActive","reshet_num","snif_num"]
+["itemcode", "itemname", "itemprice", "StartDate", "EndDate", "IsActive","num_reshet","num_snif"]
 )
 
 # דוגמת טבלת source עם נתונים חדשים
@@ -22,7 +22,7 @@ df_new = spark.createDataFrame([
     (2, "Product B", 25, "2024-02-10",1,1),
     (3, "Product C", 30, "2024-02-10",1,1)
 ], 
-["itemcode", "itemname", "itemprice", "filedate","reshet_num","snif_num"]
+["itemcode", "itemname", "itemprice", "filedate","num_reshet","num_snif"]
 )
 
 
@@ -35,7 +35,7 @@ def apply_scd_type2(spark:SparkSession ,df_old,df_new):
     source_alias = source.alias("n")
 
     df_new_update = source_alias.join(target_alias.filter(F.col("o.IsActive")==1),
-                                ["itemcode","itemname","reshet_num","snif_num"],
+                                ["itemcode","itemname","num_reshet","num_snif"],
                                 "outer") \
         .withColumn("Action",
                     F.when(F.col("o.itemprice_o").isNull(), F.lit("NEW"))
@@ -57,23 +57,27 @@ def apply_scd_type2(spark:SparkSession ,df_old,df_new):
                     .otherwise(F.col("o.itemprice_o")))  
 
     df_new_update_change_col = df_new_update\
-        .select(F.col("itemcode"),F.col("itemname"),F.col("reshet_num"),F.col("snif_num"),F.col("StartDate"),F.col("EndDate"),F.col("IsActive"),F.col("itemprice"))
+        .select(F.col("itemcode"),F.col("itemname"),F.col("num_reshet"),F.col("num_snif"),F.col("StartDate"),F.col("EndDate"),F.col("IsActive"),F.col("itemprice"))
 
 
                 
     df_add_row = df_new_update.filter(F.col("Action") == "UPDATE")\
         .withColumn("IsActive",F.lit(1))\
         .withColumn("EndDate",F.lit(None))\
-        .select(F.col("itemcode"),F.col("itemname"),F.col("reshet_num"),F.col("snif_num"),F.col("filedate").alias("StartDate"),F.col("EndDate"),F.col("IsActive"),F.col("itemprice_n").alias("itemprice"))
+        .select(F.col("itemcode"),F.col("itemname"),F.col("num_reshet"),F.col("num_snif"),F.col("filedate").alias("StartDate"),F.col("EndDate"),F.col("IsActive"),F.col("itemprice_n").alias("itemprice"))
 
 
     df_not_active = target.filter(F.col("IsActive")==0)\
-        .select(F.col("itemcode"),F.col("itemname"),F.col("reshet_num"),F.col("snif_num"),F.col("StartDate"),F.col("EndDate"),F.col("IsActive"),F.col("itemprice_o").alias("itemprice"))
+        .select(F.col("itemcode"),F.col("itemname"),F.col("num_reshet"),F.col("num_snif"),F.col("StartDate"),F.col("EndDate"),F.col("IsActive"),F.col("itemprice_o").alias("itemprice"))
 
 
     df_final = df_new_update_change_col.union(df_add_row).union(df_not_active)
+    return df_final
+    # df_final.show()
 
-    df_final.show()
 
+df = apply_scd_type2(spark,df_old,df_new)
+window_spec = Window.partitionBy("itemcode", "num_reshet","num_snif").orderBy(F.col("StartDate").desc())
+df1 = df.withColumn("rn", F.row_number().over(window_spec))
 
-apply_scd_type2(spark,df_old,df_new)
+df1.show()

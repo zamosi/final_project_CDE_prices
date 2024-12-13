@@ -101,7 +101,6 @@ def spark_read_data_from_postgres(spark: SparkSession, table_name: str) -> DataF
 
     return df
 
-
 def spark_write_data_to_postgres(spark: SparkSession, table_name: str,df):
 
     jdbc_url = f"jdbc:postgresql://{config['Postgres_Data']['HOST']}:{config['Postgres_Data']['PORT']}/{config['Postgres_Data']['DB']}"
@@ -114,13 +113,11 @@ def spark_write_data_to_postgres(spark: SparkSession, table_name: str,df):
         "url": jdbc_url
         }
 
-    query = df.writeStream \
-        .foreachBatch(lambda batch_df, _: batch_df.write \
-                    .jdbc(url=postgres_options["url"], table=postgres_options["dbtable"], mode="append", properties=postgres_options)) \
-        .outputMode("append") \
-        .start()
+    df.write \
+        .jdbc(url=postgres_options["url"], table=postgres_options["dbtable"], mode="append", properties=postgres_options) 
 
-    query.awaitTermination()
+
+
 
 
 
@@ -131,18 +128,18 @@ def spark_write_data_to_postgres(spark: SparkSession, table_name: str,df):
 
 def spark_consumer_to_df(spark: SparkSession,topic:str,schema):
     stream_df = spark \
-        .readStream \
+        .read \
         .format('kafka') \
         .option("kafka.bootstrap.servers", config["Kafka"]["KAFKA_BOOTSTRAP_SERVERS"]) \
         .option("subscribe", topic) \
-        .option('startingOffsets', 'latest') \
-        .option("failOnDataLoss", "false") \
+        .option("kafka.group.id", "myConsumerGroup")\
         .load() \
         .select(F.col('value').cast(T.StringType()))
 
     parsed_df = stream_df \
         .withColumn('parsed_json', F.from_json(F.col('value'), schema)) \
         .select(F.col('parsed_json.*'))
+    
 
     return parsed_df 
 
@@ -154,9 +151,10 @@ def procuder_minio_to_kafka(spark:SparkSession,topic,schema):
     spark.conf.set("fs.s3a.secret.key", config["Minio"]["Secret_Key"])
     spark.conf.set("fs.s3a.path.style.access", "true")
 
-    df_stream = spark.readStream \
+    df_stream = spark.read \
         .format("parquet") \
         .schema(schema)\
+        .option("kafka.group.id", "myConsumerGroup")\
         .option("path", f"s3a://{topic}/") \
         .load()
     
@@ -164,15 +162,14 @@ def procuder_minio_to_kafka(spark:SparkSession,topic,schema):
 
     json_df = df_stream.select(F.to_json(F.struct([col for col in df_stream.columns])).alias("value"))
 
-    query = json_df.writeStream \
+
+    query = json_df.write \
         .format("kafka") \
         .option("kafka.bootstrap.servers", config["Kafka"]["KAFKA_BOOTSTRAP_SERVERS"]) \
         .option("topic", topic) \
-        .outputMode("update") \
-        .option("checkpointLocation", f"s3a://spark/{topic}/checkpoints/") \
-        .start()
+        .save()
 
-    query.awaitTermination()
+
     logger.info("Transfer data to kafka - completed.")
 
 
