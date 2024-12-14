@@ -84,8 +84,8 @@ CREATE TABLE dwh.prices_scd (
     StartDate DATE,
     EndDate DATE,
     IsActive INT,
-    reshet_num BIGINT,
-    snif_num INT
+    num_reshet BIGINT,
+    num_snif INT
 );
 
 
