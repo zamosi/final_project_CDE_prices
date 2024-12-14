@@ -1,5 +1,6 @@
 import logging
 from datetime import datetime
+import sys
 
 from psycopg2 import connect
 from configparser import ConfigParser
@@ -194,6 +195,24 @@ def init_minio_client() -> Minio:
         logger.error(f'Unable create MinIO client with the following error: \n{e}')
         raise
     
+
+def spark_read_from_bucket(spark: SparkSession, path: str, format: str = "parquet") -> DataFrame:
+    """
+    Reads data from a given bucket path into a Spark DataFrame.
+
+    Returns:
+        DataFrame: A Spark DataFrame containing the data from the bucket.
+    """           
+    
+    try:
+        df = spark.read.format(format).load(path)
+        logger.info(f"Data from {path} loaded successfully.")
+        return df
+    
+    except Exception as e:
+        logger.error(e)
+        sys.exit(1)
+
 
 def spark_write_data_to_bucket(df: DataFrame, bucket_name: str):
     """

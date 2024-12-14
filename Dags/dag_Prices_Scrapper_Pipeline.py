@@ -89,7 +89,7 @@ with DAG(
         ml_consumer = SSHOperator(
             task_id='ml_consumer',
             ssh_conn_id='ssh_default',
-            command='python3 /home/developer/projects/spark-course-python/spark_course_python/final_project/final_project_CDE_prices/Pipeline/consumer_to_ml.py'
+            command='python3 /home/developer/projects/spark-course-python/spark_course_python/final_project/final_project_CDE_prices/Pipeline/consumer_prices_data.py'
         )
 
     # Steps of the DAG

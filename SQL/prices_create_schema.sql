@@ -1,6 +1,5 @@
 CREATE SCHEMA RAW_DATA;
 
-
 CREATE TABLE RAW_DATA.SNIFIM (
     storeid INT,
     bikoretno INT,
@@ -66,8 +65,6 @@ CREATE TABLE RAW_DATA.PRICES_N (
 );
 
 
-
-
 CREATE TABLE RAW_DATA.RESHATOT (
     reshet_name VARCHAR(255),
     reshet_num BIGINT,
@@ -90,3 +87,35 @@ CREATE TABLE dwh.prices_scd (
     reshet_num BIGINT,
     snif_num INT
 );
+
+
+CREATE TABLE dwh.prices_data (
+    snapshot DATE,
+    snapshot_month VARCHAR(10),
+    snapshot_quarter VARCHAR(10),
+    is_weekend BOOLEAN,
+    itemcode BIGINT,
+    itemname VARCHAR(100),
+    manufacturername VARCHAR(50),
+    manufacturecountry VARCHAR(20),
+    manufactureritemdescription VARCHAR(100),
+    unitqty VARCHAR(30),
+    unitofmeasure VARCHAR(25),
+    qtyinpackage VARCHAR(7),
+    itemprice FLOAT,
+    unitofmeasureprice FLOAT,
+    allowdiscount BOOLEAN,
+    file_name VARCHAR(50),
+    num_reshet VARCHAR(13),
+    priceupdatedate TIMESTAMP,
+    file_date TIMESTAMP,
+    run_time TIMESTAMP,
+    num_snif INTEGER,
+    reshet_name VARCHAR(50),
+    storename VARCHAR(50),
+    address VARCHAR(30),
+    city VARCHAR(30),
+    zipcode INTEGER,
+    days_since_last_price_update INTEGER,
+    is_price_update_stale INTEGER
+) PARTITION BY RANGE (snapshot);
