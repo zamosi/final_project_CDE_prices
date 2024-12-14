@@ -118,4 +118,6 @@ CREATE TABLE dwh.prices_data (
     zipcode INTEGER,
     days_since_last_price_update INTEGER,
     is_price_update_stale INTEGER
-) PARTITION BY RANGE (snapshot);
+);
+
+

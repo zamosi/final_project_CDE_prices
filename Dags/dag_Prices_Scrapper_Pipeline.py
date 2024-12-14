@@ -22,8 +22,8 @@ with DAG(
     dag_id='Prices_Scrapper_Pipeline',
     default_args=default_args,
     description='A DAG to run branch_scraper.py daily at 10:00 PM',
-    schedule_interval='0 22 * * *',
-    start_date=datetime(2024, 11, 9),
+    schedule_interval='0 20 * * *',
+    start_date=datetime(2024, 12, 14),
     catchup=False,
     tags=['scrapper', 'daily']
 ) as dag:
@@ -85,12 +85,20 @@ with DAG(
     # Task group for consumers tasks
     with TaskGroup("Consumers_Tasks") as consumers_tasks:
 
-        # Task to consume ML data
-        ml_consumer = SSHOperator(
-            task_id='ml_consumer',
+        # Task to consume prices data
+        prices_data_consumer = SSHOperator(
+            task_id='prices_data_consumer',
             ssh_conn_id='ssh_default',
             command='python3 /home/developer/projects/spark-course-python/spark_course_python/final_project/final_project_CDE_prices/Pipeline/consumer_prices_data.py'
         )
+        
+    with TaskGroup("Delete_Old_And_Archiving") as delete_and_archiving:
+        # Task to delete data older than 7 days
+        delete_old_data = SSHOperator(
+            task_id='delete_old_data',
+            ssh_conn_id='ssh_default',
+            command='python3 /home/developer/projects/spark-course-python/spark_course_python/final_project/final_project_CDE_prices/Pipeline/delete_old_data.py'
+        )
 
     # Steps of the DAG
-    [validate_schema, validate_buckets] >> scrapper_tasks >> [snifim_producer, prices_producer] >> consumers_tasks
+    [validate_schema, validate_buckets] >> scrapper_tasks >> [snifim_producer, prices_producer] >> consumers_tasks >> [delete_old_data]

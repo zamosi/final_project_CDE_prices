@@ -48,22 +48,6 @@ def check_file_exists(path:str) -> bool:
     return os.path.isfile(path)
 
 
-def upload_to_minio(minio_client, bucket_name, folder_name, file_path):
-    """
-    Uploads a file to a specified folder in a MinIO bucket.
-    """
-    try:
-        # Construct the destination path in the bucket
-        file_name = os.path.basename(file_path)
-        object_name = os.path.join(folder_name, file_name)
-
-        # Upload the file
-        minio_client.fput_object(bucket_name, object_name, file_path)
-        logger.info(f"File '{file_path}' uploaded to '{bucket_name}/{object_name}'.")
-    except Exception as e:
-        logger.error(f"Failed to upload file to MinIO: {e}")
-
-
 def main():
     # Define path to Excel with stores
     excel_path = config["Core_Settings"]["MARKETS_DETAILS_EXCEL_PATH"]
