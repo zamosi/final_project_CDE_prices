@@ -117,11 +117,6 @@ def spark_write_data_to_postgres(spark: SparkSession, table_name: str,df):
         .jdbc(url=postgres_options["url"], table=postgres_options["dbtable"], mode="append", properties=postgres_options) 
 
 
-
-
-
-
-
 #****************************************************************************************************
 #*                                              Kafka                                               *
 #****************************************************************************************************
@@ -200,24 +195,23 @@ def init_minio_client() -> Minio:
         raise
     
 
-def spark_write_data_to_bucket(df: DataFrame, bucket_name:str):
+def spark_write_data_to_bucket(df: DataFrame, bucket_name: str):
     """
     Writes the DataFrame as Parquet files to the MinIO bucket with file naming convention ml_yyyymmdd.
     """
     try:
         # Generate the dynamic output path with the desired file name format
         date_str = datetime.now().strftime("%Y%m%d")
-        output_path = f"s3a://{bucket_name}/ml_{date_str}"
+        output_path = f"s3a://{bucket_name}/{date_str}/"  # Updated to include ml_yyyymmdd in the path
 
-        query = df.writeStream \
-            .outputMode("append") \
+        df.write \
             .format("parquet") \
+            .mode("append") \
             .option("path", output_path) \
-            .option("checkpointLocation", f"s3a://spark/ML/checkpoints/") \
-            .start()
+            .save()
 
-        query.awaitTermination()
+        logger.info(f"Data written successfully to {output_path}")
 
     except Exception as e:
         logger.error(f"Error writing Parquet files to bucket: {e}")
-        raise   
+        raise

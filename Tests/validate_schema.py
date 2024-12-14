@@ -13,11 +13,9 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from Connections.connection import connect_to_postgres_data
 import SQL
 
-
 # Load configuration
 config = ConfigParser()
 config.read("/home/developer/projects/spark-course-python/spark_course_python/final_project/final_project_CDE_prices/config/config.conf")
-
 
 # Set up Logging
 logging.basicConfig(
@@ -26,38 +24,26 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-
-def parse_sql_file(file_path:str) -> list:
+def parse_sql_file(file_path: str) -> list:
     """
-    This function reads the content of the provided SQL file, searches for
+    This function reads the content of the provided SQL file, searches
     `CREATE TABLE` statements, and extracts the table names that follow the
     `schema_name.table_name` format.
 
-    Args:
-        file_path (str): The path to the SQL file to be parsed.
-
     Returns:
-        list: A list of table names (as strings) found in the SQL file.
-              If no table names are found, an empty list is returned.
-              
-    Example:
-        >>> parse_sql_file("schema.sql")
-        ['table1', 'table2']
+        A list of table names (as strings) found in the SQL file.
+        If no table names are found, an empty list is returned.
+
     """
     with open(file_path, 'r') as file:
         sql_content = file.read()
         
     return re.findall(r'CREATE TABLE\s+[a-zA-Z_]+\.(\w+)', sql_content)
 
-
 # Function to check if schema exists
 def check_schema_exists(engine: engine, schema_name: str):
     """
     Checks if the specified schema exists in the database.
-
-    Args:
-        engine (engine): Database engine connection.
-        schema_name (str): Name of the schema to validate.
 
     Raises:
         ValueError: If the schema does not exist in the database.
@@ -70,57 +56,62 @@ def check_schema_exists(engine: engine, schema_name: str):
     else:
         None
 
-
 # Function to check if tables exist
-def check_tables_exist(engine: engine, schema_name: str, list_of_tables: list):
+def check_tables_exist(engine: engine, schema_names: list, list_of_tables: list):
     """
-    Validates that all specified tables exist in the given schema int the DB.
-
-    Args:
-        engine (engine): Database engine connection.
-        schema_name (str): Name of the schema to check.
-        list_of_tables (list): List of table names to validate.
+    Validates that all specified tables exist in at least one of the given schemas in the DB.
 
     Raises:
-        ValueError: If any table in the list does not exist in the schema in DB.
+        ValueError: If any table in the list does not exist in any of the schemas in DB.
     """    
     inspector = inspect(engine)
-    existing_tables = inspector.get_table_names(schema=schema_name)
-    
+    existing_tables_by_schema = {
+        schema: inspector.get_table_names(schema=schema) for schema in schema_names
+    }
+
     # Enforce lowercase for PostgreSQL compatibility
     list_of_tables = [tab.lower() for tab in list_of_tables]
-    
+
     for table in list_of_tables:
-        if table not in existing_tables:
-            raise ValueError(f"Table '{table}' does not exist in schema '{schema_name}'.")
+        if not any(table in existing_tables_by_schema[schema] for schema in schema_names):
+            raise ValueError(f"Table '{table}' does not exist in any of the schemas: {', '.join(schema_names)}.")
         else:
             None
 
+def validate_schema_and_tables(engine: engine, schema_names: list, sql_file_path: str):
+    """
+    Validates the existence of schemas and their associated tables.
+
+    Raises:
+        ValueError: If schemas or any table does not exist.
+    """
+    list_of_tables = parse_sql_file(sql_file_path)
+
+    # Check schemas
+    for schema_name in schema_names:
+        check_schema_exists(engine, schema_name)
+
+    # Check tables across schemas
+    check_tables_exist(engine, schema_names, list_of_tables)
+
+    logger.info(f"Validation of schemas: {', '.join(schema_names)} ended with success, "
+                f"lists for check: {', '.join(list_of_tables)}")
 
 def main():
-    
+    # Paths to sql files with required schema definitions
     sql_file_path = config["Core_Settings"]["SQL_SCHEMA_FILE_PATH"]
-
+    
     # Connect to the database
     conn, engine = connect_to_postgres_data()    
     
     try:
-        schema_name = 'raw_data'
-        list_of_tables = parse_sql_file(sql_file_path)
-        
-        # Check schema and tables
-        check_schema_exists(engine, schema_name)
-        check_tables_exist(engine, schema_name, list_of_tables)   
+        # Validate raw_data and dwh schemas
+        validate_schema_and_tables(engine, ['raw_data', 'dwh'], sql_file_path)
 
-        logger.info(f"Validation of schema: {schema_name} ended with success, "
-                    f"lists for check: {', '.join(list_of_tables)}")
-        
     except ValueError as e:
-        # Catch errors and stop execution
         logger.critical(e)
         sys.exit(1)
     except Exception as e:
-        # General error handling
         logger.critical(f"An unexpected error occurred: {e}")
         sys.exit(1)
     finally:
