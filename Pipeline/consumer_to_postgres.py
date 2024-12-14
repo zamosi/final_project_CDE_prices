@@ -27,13 +27,6 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-try:
-
-    logger.info("load table dwh.prices_scd from postgres")
-except Exception as e:
-    logger.error(f"table not load {e}")
-    raise
-
 
 def spark_apply_scd_type2(spark:SparkSession ,df_old,df_new):
 
