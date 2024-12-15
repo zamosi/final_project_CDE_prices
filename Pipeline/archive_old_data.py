@@ -5,7 +5,6 @@ from configparser import ConfigParser
 from datetime import datetime, timedelta, timezone
 from minio import Minio
 import zipfile
-import tempfile
 import io
 
 # Project custom Libs

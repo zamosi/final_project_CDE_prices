@@ -99,7 +99,7 @@ with DAG(
             command='python3 /home/developer/projects/spark-course-python/spark_course_python/final_project/final_project_CDE_prices/Pipeline/consumer_to_postgres.py'
         )
 
-        # Consumers tasks sequence
+        # Consumers task sequence
         Prices_Data_Consumer >> Prices_Scd
         
     with TaskGroup("Delete_Old_And_Archiving") as delete_and_archiving:
