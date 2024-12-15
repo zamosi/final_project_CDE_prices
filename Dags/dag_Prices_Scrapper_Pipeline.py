@@ -23,7 +23,7 @@ with DAG(
     default_args=default_args,
     description='A DAG to run branch_scraper.py daily at 10:00 PM',
     schedule_interval='0 20 * * *',
-    start_date=datetime(2024, 12, 14),
+    start_date=datetime(2024, 12, 15),
     catchup=False,
     tags=['scrapper', 'daily']
 ) as dag:

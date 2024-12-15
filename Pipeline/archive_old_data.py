@@ -96,7 +96,7 @@ def update_zip_archive(minio_client:Minio, bucket_name:str, archive_name:str, ol
 
 def archive_and_delete_files(minio_client:Minio, bucket_name:str, threshold:int, archive_name:str):
     """
-    Archive files older than the threshold and delete them from the bucket.
+    Archive files older than the threshold and delete them from the bucket. 
 
     Returns:
         None
