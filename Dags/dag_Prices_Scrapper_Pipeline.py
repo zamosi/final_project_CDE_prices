@@ -14,7 +14,7 @@ default_args = {
     'email_on_failure': True, 
     'email_on_retry': False,
     'retries': 3,
-    'retry_delay': timedelta(minutes=1), 
+    'retry_delay': timedelta(minutes=5), 
 }
 
 # Define the DAG
@@ -32,14 +32,14 @@ with DAG(
     with TaskGroup("Validation_Tasks") as validation_tasks:
 
         # Task to validate the schema in the database.
-        validate_schema = SSHOperator(
+        Validate_Schema = SSHOperator(
             task_id='Validate_Schema_In_DB',
             ssh_conn_id='ssh_default',
             command='python3 /home/developer/projects/spark-course-python/spark_course_python/final_project/final_project_CDE_prices/Tests/validate_schema.py'
         )
 
         # Task to validate the minio buckets.
-        validate_buckets = SSHOperator(
+        Validate_Buckets = SSHOperator(
             task_id='Validate_MinIO_Buckets',
             ssh_conn_id='ssh_default',
             command='python3 /home/developer/projects/spark-course-python/spark_course_python/final_project/final_project_CDE_prices/Tests/validate_minio.py'
@@ -49,35 +49,35 @@ with DAG(
     with TaskGroup("Scrapper_Tasks") as scrapper_tasks:
 
         # Task loads markets list into Postgres
-        load_markets = SSHOperator(
+        Load_Markets = SSHOperator(
             task_id='Load_Markets_List',
             ssh_conn_id='ssh_default',
             command='python3 /home/developer/projects/spark-course-python/spark_course_python/final_project/final_project_CDE_prices/scripts/load_reshatot_from_excel_to_postgers.py'
         )   
 
         # Daily scrapper
-        run_scraper = SSHOperator(
-            task_id='run_branch_scraper',
+        Run_Scraper = SSHOperator(
+            task_id='Run_Rranch_Scraper',
             ssh_conn_id='ssh_default',
             command='python3 /home/developer/projects/spark-course-python/spark_course_python/final_project/final_project_CDE_prices/Scrappers/branch_scraper_all_files.py'
         )  
 
         # Scrapper tasks sequence
-        load_markets >> run_scraper
+        Load_Markets >> Run_Scraper
 
     # Task group for producers tasks
     with TaskGroup("Producers_Tasks") as producers_tasks:
 
         # Task to produce snifim data
-        snifim_producer = SSHOperator(
-            task_id='snifim_producer',
+        Snifim_Producer = SSHOperator(
+            task_id='Snifim_Producer',
             ssh_conn_id='ssh_default',
             command='python3 /home/developer/projects/spark-course-python/spark_course_python/final_project/final_project_CDE_prices/Pipeline/snifim_procuder.py'
         )
 
         # Task to produce prices data
-        prices_producer = SSHOperator(
-            task_id='prices_producer',
+        Prices_Producer = SSHOperator(
+            task_id='Prices_Producer',
             ssh_conn_id='ssh_default',
             command='python3 /home/developer/projects/spark-course-python/spark_course_python/final_project/final_project_CDE_prices/Pipeline/prices_procuder.py'
         )
@@ -86,19 +86,36 @@ with DAG(
     with TaskGroup("Consumers_Tasks") as consumers_tasks:
 
         # Task to consume prices data
-        prices_data_consumer = SSHOperator(
-            task_id='prices_data_consumer',
+        Prices_Data_Consumer = SSHOperator(
+            task_id='Prices_Data_Consumer',
             ssh_conn_id='ssh_default',
             command='python3 /home/developer/projects/spark-course-python/spark_course_python/final_project/final_project_CDE_prices/Pipeline/consumer_prices_data.py'
         )
+
+        # Task to consume scd data
+        Prices_Scd = SSHOperator(
+            task_id='Prices_Scd',
+            ssh_conn_id='ssh_default',
+            command='python3 /home/developer/projects/spark-course-python/spark_course_python/final_project/final_project_CDE_prices/Pipeline/consumer_to_postgres.py'
+        )
+
+        # Consumers tasks sequence
+        Prices_Data_Consumer >> Prices_Scd
         
     with TaskGroup("Delete_Old_And_Archiving") as delete_and_archiving:
         # Task to delete data older than 7 days
-        delete_old_data = SSHOperator(
-            task_id='delete_old_data',
+        Delete_Old_Data = SSHOperator(
+            task_id='Delete_Old_Data',
             ssh_conn_id='ssh_default',
             command='python3 /home/developer/projects/spark-course-python/spark_course_python/final_project/final_project_CDE_prices/Pipeline/delete_old_data.py'
         )
+        
+        # Task to zip data older than 7 days prices bucket
+        Archive_Old_Data = SSHOperator(
+            task_id='Archive_Old_Data',
+            ssh_conn_id='ssh_default',
+            command='python3 /home/developer/projects/spark-course-python/spark_course_python/final_project/final_project_CDE_prices/Pipeline/archive_old_data.py'
+        )
 
     # Steps of the DAG
-    [validate_schema, validate_buckets] >> scrapper_tasks >> [snifim_producer, prices_producer] >> consumers_tasks >> [delete_old_data]
+    [Validate_Schema, Validate_Buckets] >> scrapper_tasks >> [Snifim_Producer, Prices_Producer] >> consumers_tasks >> [Delete_Old_Data, Archive_Old_Data]
