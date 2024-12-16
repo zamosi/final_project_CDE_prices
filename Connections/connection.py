@@ -7,11 +7,9 @@ from configparser import ConfigParser
 from sqlalchemy import create_engine
 
 from pyspark.sql import DataFrame, SparkSession
-from pyspark.sql.functions import to_json, struct
-from pyspark.sql.window import Window
-from pyspark.sql.functions import row_number
 from pyspark.sql import functions as F
 from pyspark.sql import types as T
+from pyspark.sql.types import StructType
 
 from minio import Minio
 
@@ -34,12 +32,12 @@ logger = logging.getLogger(__name__)
 
 def connect_to_postgres_data():
     """
-    Connects to a PostgreSQL database  based on values parsed from config file and returns a connection 
+    Connects to a PostgreSQL database  based on values parsed from config file, returns a connection 
     object and SQLAlchemy engine.
 
     Returns:
-        tuple: A tuple containing the psycopg2 connection object and SQLAlchemy engine.
-               Returns None if an error occurs.
+        A tuple containing the psycopg2 connection object and SQLAlchemy engine.
+        Returns None if an error occurs.
     """    
     try:
         # Connect to PostgreSQL using psycopg2-binary
@@ -61,6 +59,7 @@ def connect_to_postgres_data():
         logger.error(f"An error occurred: {e}")
         return None
 
+
 def truncate_table_in_postgres(conn,table_name):
 
     try:
@@ -73,6 +72,7 @@ def truncate_table_in_postgres(conn,table_name):
         logger.error(f"Error occurred while truncating table: {e}")
     finally:
         cursor.close()
+
 
 def spark_read_data_from_postgres(spark: SparkSession, table_name: str) -> DataFrame:
     """
@@ -102,8 +102,11 @@ def spark_read_data_from_postgres(spark: SparkSession, table_name: str) -> DataF
 
     return df
 
-def spark_write_data_to_postgres(spark: SparkSession, table_name: str,df):
 
+def spark_write_data_to_postgres(spark: SparkSession, table_name: str,df):
+    """
+    Writes a Spark DataFrame to a PostgreSQL database table.
+    """
     jdbc_url = f"jdbc:postgresql://{config['Postgres_Data']['HOST']}:{config['Postgres_Data']['PORT']}/{config['Postgres_Data']['DB']}"
 
     postgres_options  = {
@@ -122,8 +125,15 @@ def spark_write_data_to_postgres(spark: SparkSession, table_name: str,df):
 #*                                              Kafka                                               *
 #****************************************************************************************************
 
-def spark_consumer_to_df(spark: SparkSession,topic:str,schema):
-    stream_df = spark \
+def spark_consumer_to_df(spark: SparkSession, topic:str, schema:StructType) -> DataFrame:
+    """
+    Reads data from a Kafka topic and converts it into a Spark DataFrame with the specified schema.
+
+    Returns:
+        DataFrame: A Spark DataFrame containing the parsed data from the Kafka topic.
+    """   
+    
+    df = spark \
         .read \
         .format('kafka') \
         .option("kafka.bootstrap.servers", config["Kafka"]["KAFKA_BOOTSTRAP_SERVERS"]) \
@@ -131,23 +141,22 @@ def spark_consumer_to_df(spark: SparkSession,topic:str,schema):
         .option("kafka.group.id", "myConsumerGroup")\
         .load() \
         .select(F.col('value').cast(T.StringType()))
-
-    parsed_df = stream_df \
+    
+    parsed_df = df \
         .withColumn('parsed_json', F.from_json(F.col('value'), schema)) \
         .select(F.col('parsed_json.*'))
     
-
     return parsed_df 
 
 
-def procuder_minio_to_kafka(spark:SparkSession,topic,schema):
+def procuder_minio_to_kafka(spark:SparkSession, topic:str, schema:StructType):
     # Set MinIO credentials and endpoint
     spark.conf.set("fs.s3a.endpoint", config["Minio"]["HTTP_Url"])
     spark.conf.set("fs.s3a.access.key", config["Minio"]["Access_Key"])
     spark.conf.set("fs.s3a.secret.key", config["Minio"]["Secret_Key"])
     spark.conf.set("fs.s3a.path.style.access", "true")
 
-    df_stream = spark.read \
+    df = spark.read \
         .format("parquet") \
         .schema(schema)\
         .option("kafka.group.id", "myConsumerGroup")\
@@ -156,7 +165,7 @@ def procuder_minio_to_kafka(spark:SparkSession,topic,schema):
     
     logger.info("spark read-stream created.")
 
-    json_df = df_stream.select(F.to_json(F.struct([col for col in df_stream.columns])).alias("value"))
+    json_df = df.select(F.to_json(F.struct([col for col in df.columns])).alias("value"))
 
 
     query = json_df.write \
@@ -164,7 +173,6 @@ def procuder_minio_to_kafka(spark:SparkSession,topic,schema):
         .option("kafka.bootstrap.servers", config["Kafka"]["KAFKA_BOOTSTRAP_SERVERS"]) \
         .option("topic", topic) \
         .save()
-
 
     logger.info("Transfer data to kafka - completed.")
 

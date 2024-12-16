@@ -33,7 +33,7 @@ def insert_dataframe_to_postgres(engine, df: pd.DataFrame, table_name: str):
     """
     try:
         df.to_sql(table_name, con=engine, schema='raw_data', if_exists='replace', index=False)
-        logger.info(f"Data inserted successfully into {table_name}.")
+        logger.info(f"Data inserted successfully into {table_name} table.")
     except Exception as e:
         logger.error(f"Error inserting data into PostgreSQL: {e}")
 
@@ -52,16 +52,22 @@ def main():
     # Define path to Excel with stores
     excel_path = config["Core_Settings"]["MARKETS_DETAILS_EXCEL_PATH"]
 
+    conn, engine = connect_to_postgres_data()
+
     # Validate file existence
     if check_file_exists(excel_path):
         df = pd.read_excel(excel_path)
         df['run_time'] = datetime.now()
         df['password'] = df['password'].astype(str).str.strip()
-        conn, engine = connect_to_postgres_data()
         insert_dataframe_to_postgres(engine, df, 'reshatot')
-
     else:
         logger.critical("File doesn't exist in the given path, please set the file first in the folder!")
+
+    conn.close()
+    logger.info("Connection closed.")
+    
+    engine.dispose()
+    logger.info("Engine disposed.")
 
 
 if __name__ == '__main__':

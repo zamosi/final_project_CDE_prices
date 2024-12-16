@@ -21,7 +21,7 @@ default_args = {
 with DAG(
     dag_id='Prices_Scrapper_Pipeline',
     default_args=default_args,
-    description='A DAG to run branch_scraper.py daily at 10:00 PM',
+    description='An automated pipeline to validate data, scrape prices, produce and consume data, and handle archiving and cleanup for daily pricing data processing.',
     schedule_interval='0 20 * * *',
     start_date=datetime(2024, 12, 15),
     catchup=False,
@@ -101,7 +101,8 @@ with DAG(
 
         # Consumers task sequence
         Prices_Data_Consumer >> Prices_Scd
-        
+
+    # Task group for post load actions - Archive old data, delete data older than 7 days  
     with TaskGroup("Delete_Old_And_Archiving") as delete_and_archiving:
         # Task to delete data older than 7 days
         Delete_Old_Data = SSHOperator(

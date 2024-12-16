@@ -20,14 +20,14 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def delete_old_data(conn, table_name:str):
+def delete_old_data(conn, table_name:str, threshold: int):
     try:
         cursor = conn.cursor()
         
         # SQL query to delete rows older than 7 days
         delete_query = f"""
             DELETE FROM {table_name}
-            WHERE snapshot <= CURRENT_DATE - INTERVAL '7 days';
+            WHERE snapshot <= CURRENT_DATE - INTERVAL '{threshold} days';
         """
         
         # Execute the query
@@ -40,6 +40,12 @@ def delete_old_data(conn, table_name:str):
 
         # Get the number of deleted rows
         logger.info(f"{cursor.rowcount} rows deleted.")
+
+        if cursor.rowcount > 0:
+            logger.info("Old data cleanup completed successfully.")
+        else:
+            logger.info("There was no data older than 7 days")
+
     
     except Exception as e:
         logging.error(f"Error: {e}")
@@ -60,9 +66,7 @@ if __name__ == '__main__':
     logger.info("Database connection established.")
 
     try:
-        delete_old_data(conn, table_name)
-        logger.info("Old data cleanup completed successfully.")
-        
+        delete_old_data(conn, table_name, 7)
     except Exception as e:
         logger.error(e)
 

@@ -103,8 +103,7 @@ def archive_and_delete_files(minio_client:Minio, bucket_name:str, threshold:int,
     old_objects = get_objects_older_than(minio_client, bucket_name, threshold)
     # in case of no files older than a threshold - stop excution of the file
     if not old_objects:
-        logger.info("No files to archive.")
-        sys.exit(1)
+        logger.warning("No files to archive.")
 
     update_zip_archive(minio_client, bucket_name, archive_name, old_objects)
     

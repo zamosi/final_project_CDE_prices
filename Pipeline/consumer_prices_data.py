@@ -155,7 +155,6 @@ def main():
             
             logger.info("Replaced null values with default values...")
 
-
             # Write to MinIO bucket
             spark_write_data_to_bucket(df, 'ml-bucket')
             logger.info("Data successfully written to MinIO bucket.")
