@@ -132,7 +132,8 @@ def load_offsets(path:str) -> dict:
     try:
         with open(path, 'r') as file:
             content = file.read()
-            if not content.strip():  # Check if file is blank
+             # Check if file is blank
+            if not content.strip(): 
                 logger.warning("Offset file is blank. Using 'earliest'.")
                 return {"offsets": "earliest"}
             
@@ -171,15 +172,22 @@ def save_offsets(df: DataFrame, path:str):
     logger.info("Offsets successfully saved.")
 
 
-def spark_consumer_to_df(spark: SparkSession, topic: str, schema: StructType) -> DataFrame:
+def spark_consumer_to_df(spark: SparkSession, topic: str, schema: StructType, offset_file:str, consumer_group:str) -> DataFrame:
     """
-    Reads data from a Kafka topic starting from the last stored offsets and keeps metadata for offset tracking.
+    Reads data from a Kafka topic, starting from the last stored offsets, and returns a DataFrame with message data 
+    and metadata for offset tracking.
+
+    Returns:
+    A Spark DataFrame containing parsed Kafka message data along with Kafka metadata:
+        - Parsed fields from the schema.
+        - Kafka metadata columns: `topic`, `partition`, `offset`.
     """
+
     # Load last stored offsets
-    offsets = load_offsets(config["Kafka"]["PRICES_OFFSETS_FILE"])
+    offsets = load_offsets(offset_file)
     
     # Prepare Kafka startingOffsets JSON
-    starting_offsets = "earliest"  # Default fallback
+    starting_offsets = "earliest" 
     
     if "offsets" in offsets and isinstance(offsets["offsets"], dict):
         stored_offsets = offsets["offsets"]
@@ -193,6 +201,7 @@ def spark_consumer_to_df(spark: SparkSession, topic: str, schema: StructType) ->
         .option("kafka.bootstrap.servers", config["Kafka"]["KAFKA_BOOTSTRAP_SERVERS"]) \
         .option("subscribe", topic) \
         .option("startingOffsets", starting_offsets) \
+        .option("kafka.group.id", consumer_group)\
         .load()
 
     # Extract metadata and parsed JSON
@@ -205,8 +214,8 @@ def spark_consumer_to_df(spark: SparkSession, topic: str, schema: StructType) ->
         ) \
         .withColumn('parsed_json', F.from_json(F.col('value'), schema)) \
         .select(
-            F.col("parsed_json.*"),  # Extract fields from parsed JSON
-            F.col("topic"),          # Retain metadata temporarily for offsets
+            F.col("parsed_json.*"),
+            F.col("topic"),
             F.col("partition"),
             F.col("offset")
         )

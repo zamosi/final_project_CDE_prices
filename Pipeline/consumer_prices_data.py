@@ -74,8 +74,14 @@ def main():
         
         logger.info('Spark session created.')
 
+        # Consumer group
+        consumer_group = config["Kafka"]["PRICES_CONSUMER_GROUP"]
+        
+        # Path to offset files
+        offset_files = config["Kafka"]["PRICES_OFFSETS_FILE"]
+
         # Consume Kafka stream with offsets
-        df_with_metadata = spark_consumer_to_df(spark, topic, prices_schema)
+        df_with_metadata = spark_consumer_to_df(spark, topic, prices_schema, offset_files, consumer_group)
 
         # Extract offsets immediately for saving
         offsets_df = df_with_metadata.select("topic", "partition", "offset").distinct()
