@@ -21,6 +21,12 @@ logger = logging.getLogger(__name__)
 
 
 def delete_old_data(conn, table_name:str, threshold: int):
+    """
+    Deletes rows older than a specified threshold (in days) from a given table in a PostgreSQL database.
+
+    Returns:
+        None
+    """
     try:
         cursor = conn.cursor()
         
