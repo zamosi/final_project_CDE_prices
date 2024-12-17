@@ -13,7 +13,8 @@ from Connections.connection import(spark_consumer_to_df,
                                    spark_read_data_from_postgres, 
                                    spark_write_data_to_bucket, 
                                    spark_read_from_bucket, 
-                                   spark_write_data_to_postgres)
+                                   spark_write_data_to_postgres,
+                                   save_offsets)
 
 # Load database configuration
 config = ConfigParser()
@@ -73,11 +74,14 @@ def main():
         
         logger.info('Spark session created.')
 
-        # Read Kafka stream
-        df = spark_consumer_to_df(spark, topic, prices_schema)
+        # Consume Kafka stream with offsets
+        df_with_metadata = spark_consumer_to_df(spark, topic, prices_schema)
 
-        # Data cleansing: filter rows with non-null itemcode and priceupdatedate
-        df = df.filter(F.col("itemcode").isNotNull() & F.col("priceupdatedate").isNotNull())
+        # Extract offsets immediately for saving
+        offsets_df = df_with_metadata.select("topic", "partition", "offset").distinct()
+
+        # Drop metadata columns to prevent further errors
+        df = df_with_metadata.drop("topic", "partition", "offset")
 
         # Check if DataFrame has rows
         if df.count() > 1:
@@ -164,6 +168,9 @@ def main():
             spark_write_data_to_postgres(spark, dest_postgers_datble, df)
             logger.info(f"Data successfully written to {dest_postgers_datble} table.")
 
+
+            save_offsets(offsets_df, config["Kafka"]["PRICES_OFFSETS_FILE"])
+            logger.info("Offsets saved successfully.")
         else:
             logger.info("DataFrame has 1 or fewer rows. Skipping processing.")
 

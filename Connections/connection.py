@@ -1,6 +1,7 @@
 import logging
 from datetime import datetime
 import sys
+import json
 
 from psycopg2 import connect
 from configparser import ConfigParser
@@ -124,29 +125,93 @@ def spark_write_data_to_postgres(spark: SparkSession, table_name: str,df):
 #****************************************************************************************************
 #*                                              Kafka                                               *
 #****************************************************************************************************
-
-def spark_consumer_to_df(spark: SparkSession, topic:str, schema:StructType) -> DataFrame:
+def load_offsets(path:str) -> dict:
     """
-    Reads data from a Kafka topic and converts it into a Spark DataFrame with the specified schema.
+    Load the last stored offsets from a file. If not found or invalid, return 'earliest'.
+    """
+    try:
+        with open(path, 'r') as file:
+            content = file.read()
+            if not content.strip():  # Check if file is blank
+                logger.warning("Offset file is blank. Using 'earliest'.")
+                return {"offsets": "earliest"}
+            
+            offsets = json.loads(content)
+            if not isinstance(offsets, dict) or "offsets" not in offsets:
+                logger.warning("Offset file is invalid. Using 'earliest'.")
+                return {"offsets": "earliest"}
 
-    Returns:
-        DataFrame: A Spark DataFrame containing the parsed data from the Kafka topic.
-    """   
+            return offsets
+    except (FileNotFoundError, json.JSONDecodeError) as e:
+        logger.warning(f"Offset file error: {e}. Using 'earliest'.")
+        return {"offsets": "earliest"}
+
+
+def save_offsets(df: DataFrame, path:str):
+    """
+    Save the latest offsets after processing.
+    """
+    # Extract Kafka offsets metadata
+    offsets = df.select("topic", "partition", "offset") \
+                .groupBy("topic", "partition") \
+                .agg(F.max("offset").alias("latest_offset")) \
+                .collect()
+
+    # Structure offsets into JSON format
+    offset_data = {"offsets": {}}
+    for row in offsets:
+        topic = row['topic']
+        partition = row['partition']
+        offset = row['latest_offset']
+        offset_data["offsets"][f"{topic}-{partition}"] = offset
+
+    # Save to file
+    with open(path, 'w') as file:
+        json.dump(offset_data, file)
+    logger.info("Offsets successfully saved.")
+
+
+def spark_consumer_to_df(spark: SparkSession, topic: str, schema: StructType) -> DataFrame:
+    """
+    Reads data from a Kafka topic starting from the last stored offsets and keeps metadata for offset tracking.
+    """
+    # Load last stored offsets
+    offsets = load_offsets(config["Kafka"]["PRICES_OFFSETS_FILE"])
     
-    df = spark \
+    # Prepare Kafka startingOffsets JSON
+    starting_offsets = "earliest"  # Default fallback
+    
+    if "offsets" in offsets and isinstance(offsets["offsets"], dict):
+        stored_offsets = offsets["offsets"]
+        offsets_json = {topic: {int(key.split('-')[1]): offset for key, offset in stored_offsets.items()}}
+        starting_offsets = json.dumps(offsets_json)
+
+    # Read Kafka stream
+    raw_df = spark \
         .read \
         .format('kafka') \
         .option("kafka.bootstrap.servers", config["Kafka"]["KAFKA_BOOTSTRAP_SERVERS"]) \
         .option("subscribe", topic) \
-        .option("kafka.group.id", "myConsumerGroup")\
-        .load() \
-        .select(F.col('value').cast(T.StringType()))
-    
-    parsed_df = df \
+        .option("startingOffsets", starting_offsets) \
+        .load()
+
+    # Extract metadata and parsed JSON
+    df_with_metadata = raw_df \
+        .select(
+            F.col("value").cast(T.StringType()),
+            F.col("topic"),
+            F.col("partition"),
+            F.col("offset")
+        ) \
         .withColumn('parsed_json', F.from_json(F.col('value'), schema)) \
-        .select(F.col('parsed_json.*'))
-    
-    return parsed_df 
+        .select(
+            F.col("parsed_json.*"),  # Extract fields from parsed JSON
+            F.col("topic"),          # Retain metadata temporarily for offsets
+            F.col("partition"),
+            F.col("offset")
+        )
+
+    return df_with_metadata
 
 
 def procuder_minio_to_kafka(spark:SparkSession, topic:str, schema:StructType):
