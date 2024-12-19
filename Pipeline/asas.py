@@ -199,18 +199,20 @@ df_wo_duplicates_per_day_conv = df_wo_duplicates_per_day.select(
     ,F.col('num_snif').cast('int')
         )
 
-#date uniqe in new data
-dates = sorted(df_wo_duplicates_per_day_conv.select("file_date").distinct().rdd.flatMap(lambda x: x).collect())
+# #date uniqe in new data
+# dates = sorted(df_wo_duplicates_per_day_conv.select("file_date").distinct().rdd.flatMap(lambda x: x).collect())
 
-#loop each date and doing scd between date and old data.
-for date in dates:
+# #loop each date and doing scd between date and old data.
+# for date in dates:
 
 
-    df_filtered_day = df_wo_duplicates_per_day_conv.filter(F.col("file_date") == date)
+#     df_filtered_day = df_wo_duplicates_per_day_conv.filter(F.col("file_date") == date)
 
-    df_result = spark_apply_scd_type2(spark,df_old, df_filtered_day)
+#     df_result = spark_apply_scd_type2(spark,df_old, df_filtered_day)
 
-    df_old = df_result
+#     df_old = df_result
+
+# df_result = spark_apply_scd_type2(spark,df_old, df_wo_duplicates_per_day_conv)
 
 
 
@@ -218,9 +220,10 @@ conn, engine = connect_to_postgres_data()
 
 save_offsets(offsets_df, offset_files)
 
-truncate_table_in_postgres(conn,'dwh.prices_scd')
-spark_write_data_to_postgres(spark,'dwh.prices_scd',df_old)
-
+# truncate_table_in_postgres(conn,'dwh.prices_scd')
+# spark_write_data_to_postgres(spark,'dwh.prices_scd',df_old)
+spark_write_data_to_postgres(spark,'dwh.prices_new',df_wo_duplicates_per_day_conv)
+spark_write_data_to_postgres(spark,'dwh.prices_old',df_old)
 
 spark.stop()
 

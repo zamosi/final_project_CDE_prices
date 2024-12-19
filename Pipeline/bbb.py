@@ -8,7 +8,7 @@ spark = SparkSession.builder.master("local").appName("SCD Type 2").getOrCreate()
 # דוגמת טבלת target עם נתונים היסטוריים
 df_old = spark.createDataFrame(
     [
-    (1, "Product A", 10, "2024-01-01", "2024-02-01", 0,1,1),
+    (1, "Product A", 10, "2024-01-01", None, 1,1,1),
     (1, "Product A", 15, "2024-02-01", None, 1,1,1),
     (2, "Product B", 20, "2024-01-01", None, 1,1,1),
     (4, "Product D", 30, "2024-01-01", None, 1,1,1)
@@ -18,9 +18,9 @@ df_old = spark.createDataFrame(
 
 # דוגמת טבלת source עם נתונים חדשים
 df_new = spark.createDataFrame([
-    (1, "Product A", 15, "2024-02-10",1,1),
-    (2, "Product B", 25, "2024-02-10",1,1),
-    (3, "Product C", 30, "2024-02-10",1,1)
+    # (1, "Product A", 15, "2024-02-10",1,1),
+    # (2, "Product B", 25, "2024-02-10",1,1),
+    # (3, "Product C", 30, "2024-02-10",1,1)
 ], 
 ["itemcode", "itemname", "itemprice", "filedate","num_reshet","num_snif"]
 )

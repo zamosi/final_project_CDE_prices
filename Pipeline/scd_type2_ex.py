@@ -12,7 +12,7 @@ from pyspark.sql.window import Window
 # Project custom Libs
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from Connections.connection import  spark_consumer_to_df,spark_write_data_to_postgres,spark_read_data_from_postgres
-from Connections.connection import connect_to_postgres_data,truncate_table_in_postgres,save_offsets
+from Connections.connection import connect_to_postgres_data,truncate_table_in_postgres
 
 
 
@@ -30,11 +30,8 @@ logger = logging.getLogger(__name__)
 
 def spark_apply_scd_type2(spark:SparkSession ,df_old,df_new):
 
-    target = df_old.withColumnRenamed("itemprice", "itemprice_o")\
-                    .withColumnRenamed("itemname", "itemname_o")
-
-    source = df_new.withColumnRenamed("itemprice", "itemprice_n")\
-                    .withColumnRenamed("itemname", "itemname_n")
+    target = df_old.withColumnRenamed("itemprice", "itemprice_o")
+    source = df_new.withColumnRenamed("itemprice", "itemprice_n")
 
     target_alias = target.alias("o")
     source_alias = source.alias("n")
@@ -45,7 +42,7 @@ def spark_apply_scd_type2(spark:SparkSession ,df_old,df_new):
 
 
         df_new_update = source_alias.join(target_alias.filter(F.col("o.IsActive")==1),
-                                    ["itemcode","num_reshet","num_snif"],
+                                    ["itemcode","itemname","num_reshet","num_snif"],
                                     "outer") \
             .withColumn("Action",
                         F.when(F.col("o.itemprice_o").isNull(), F.lit("NEW"))
@@ -64,10 +61,7 @@ def spark_apply_scd_type2(spark:SparkSession ,df_old,df_new):
                         .otherwise(F.col("o.IsActive"))) \
             .withColumn("itemprice",
                         F.when(F.col("Action")=="NEW",F.col("n.itemprice_n"))
-                        .otherwise(F.col("o.itemprice_o")))\
-            .withColumn("itemname",
-                        F.when(F.col("Action")=="NEW",F.col("n.itemname_n"))
-                        .otherwise(F.col("o.itemname_o")))  
+                        .otherwise(F.col("o.itemprice_o")))  
         
 
         df_new_update_change_col = df_new_update\
@@ -83,7 +77,7 @@ def spark_apply_scd_type2(spark:SparkSession ,df_old,df_new):
         df_add_row = df_new_update.filter(F.col("Action") == "UPDATE")\
             .withColumn("IsActive",F.lit(1))\
             .withColumn("EndDate",F.lit(None))\
-            .select(F.col("itemcode"),F.col("itemname_n").alias("itemname"),F.col("num_reshet"),F.col("num_snif"),F.col("n.file_date").alias("StartDate"),F.col("EndDate"),F.col("IsActive"),F.col("itemprice_n").alias("itemprice"))
+            .select(F.col("itemcode"),F.col("itemname"),F.col("num_reshet"),F.col("num_snif"),F.col("file_date").alias("StartDate"),F.col("EndDate"),F.col("IsActive"),F.col("itemprice_n").alias("itemprice"))
 
         logger.info("succeeded-scd-pop2")
     except Exception as e:
@@ -92,7 +86,7 @@ def spark_apply_scd_type2(spark:SparkSession ,df_old,df_new):
 
     try:
         df_not_active = target.filter(F.col("IsActive")==0)\
-            .select(F.col("itemcode"),F.col("itemname_o").alias("itemname"),F.col("num_reshet"),F.col("num_snif"),F.col("StartDate"),F.col("EndDate"),F.col("IsActive"),F.col("itemprice_o").alias("itemprice"))
+            .select(F.col("itemcode"),F.col("itemname"),F.col("num_reshet"),F.col("num_snif"),F.col("StartDate"),F.col("EndDate"),F.col("IsActive"),F.col("itemprice_o").alias("itemprice"))
         
         logger.info("succeeded-scd-pop3")
     except Exception as e:
@@ -111,31 +105,7 @@ def spark_apply_scd_type2(spark:SparkSession ,df_old,df_new):
     return df_final
 
 
-topic= 'prices'
 
-prices_schema = T.StructType([T.StructField('priceupdatedate',T.StringType(),True),
-                            T.StructField('itemcode',T.StringType(),True),
-                            T.StructField('itemtype',T.StringType(),True),
-                            T.StructField('itemname',T.StringType(),True),
-                            T.StructField('manufacturername',T.StringType(),True),
-                            T.StructField('manufacturecountry',T.StringType(),True),
-                            T.StructField('manufactureritemdescription',T.StringType(),True),
-                            T.StructField('unitqty',T.StringType(),True),
-                            T.StructField('quantity',T.StringType(),True),
-                            T.StructField('unitofmeasure',T.StringType(),True),
-                            T.StructField('bisweighted',T.StringType(),True),
-                            T.StructField('qtyinpackage',T.StringType(),True),
-                            T.StructField('itemprice',T.StringType(),True),
-                            T.StructField('unitofmeasureprice',T.StringType(),True),
-                            T.StructField('allowdiscount',T.StringType(),True),
-                            T.StructField('itemstatus',T.StringType(),True),
-                            T.StructField('itemid',T.StringType(),True),
-                            T.StructField('file_name',T.StringType(),True),
-                            T.StructField('num_reshet',T.StringType(),True),
-                            T.StructField('num_snif',T.StringType(),True),
-                            T.StructField('file_date',T.TimestampType(),True),
-                            T.StructField('run_time',T.TimestampType(),True)
-                            ])
 
 
 spark = SparkSession \
@@ -148,38 +118,43 @@ spark = SparkSession \
 .config("spark.jars", config["Core_Settings"]["POSTGRES_JDBC_DRIVERS_PATH"])\
 .getOrCreate()
 
-try:
-    df_old = spark_read_data_from_postgres(spark, 'dwh.prices_scd')
-    logger.info(f"load table dwh.prices_scd from postgres - {df_old.count()} rows ")
-except Exception as e:
-    logger.error(f"table not load {e}")
-    raise
+schema = T.StructType([
+    T.StructField("itemcode", T.LongType(), True),
+    T.StructField("itemname", T.StringType(), True),
+    T.StructField("itemprice", T.IntegerType(), True),
+    T.StructField("StartDate", T.DateType(), True),  # אפשר להחליף ל-DateType אם נדרש
+    T.StructField("EndDate", T.DateType(), True),
+    T.StructField("IsActive", T.IntegerType(), True),
+    T.StructField("num_reshet", T.LongType(), True),
+    T.StructField("num_snif", T.IntegerType(), True),
+])
 
-# Consumer group
-consumer_group = config["Kafka"]["scd_CONSUMER_GROUP"]
-# Path to offset files
-offset_files = config["Kafka"]["SCD_OFFSETS_FILE"]
+df_old = spark.createDataFrame(
+    [
+        (286549, "מטליות לניקוי כללי", 10, "2024-12-12", None, 1,7290700100008,101),
+        (123, "ששש", 10, "2024-12-12", None, 1,7290700100008,101)
+        ]
+    , schema
+["itemcode", "itemname", "itemprice", "StartDate", "EndDate", "IsActive","num_reshet","num_snif"]
+)
 
-#load new data from kafka
+# df_new = spark_read_data_from_postgres(spark, 'dwh.all_a')
 
-try:
-    # Consume Kafka stream with offsets
-    df_with_metadata = spark_consumer_to_df(spark, topic, prices_schema, offset_files, consumer_group)
-    # Extract offsets immediately for saving
-    offsets_df = df_with_metadata.select("topic", "partition", "offset").distinct()
-    
+df_new = spark.createDataFrame(
+    # [(286549, "מטליות לניקוי כללי", 15, "2024-12-13 00:40:00.000",7290700100008,101),
+    #  (286549, "מטליות לניקוי כללי", 17, "2024-12-14 00:40:00.000",7290700100008,101),
+    #  (286549, "מטליות לניקוי כללי", 20, "2024-12-15 00:40:00.000",7290700100008,101)
+    #  ], 
+["itemcode", "itemname", "itemprice", "file_date","num_reshet","num_snif"]
+)
 
-    # Drop metadata columns to prevent further errors
-    df_new = df_with_metadata.drop("topic", "partition", "offset")
-    
-    logger.info(f"consumer load data to df- {df_new.count()} rows")
-except Exception as e:
-    logger.error(f"consumer not load {e}")
-    raise
+
+
+
 
 
 #fiter just files "PriceFull"
-df_new_full = df_new.filter(F.col("file_name").startswith("PriceFull")& (F.col('num_reshet') == '7290700100008')) \
+df_new_full = df_new.filter( (F.col('num_reshet') == '7290700100008')) \
                     .withColumn("file_date2",F.to_date(F.col("file_date")))
 
 #add row_number column that give item per reshet,snif,day
@@ -205,22 +180,19 @@ dates = sorted(df_wo_duplicates_per_day_conv.select("file_date").distinct().rdd.
 #loop each date and doing scd between date and old data.
 for date in dates:
 
-
     df_filtered_day = df_wo_duplicates_per_day_conv.filter(F.col("file_date") == date)
 
     df_result = spark_apply_scd_type2(spark,df_old, df_filtered_day)
 
     df_old = df_result
 
-
-
 conn, engine = connect_to_postgres_data()
 
-save_offsets(offsets_df, offset_files)
 
-truncate_table_in_postgres(conn,'dwh.prices_scd')
-spark_write_data_to_postgres(spark,'dwh.prices_scd',df_old)
+# truncate_table_in_postgres(conn,'dwh.prices_scd')
+# spark_write_data_to_postgres(spark,'dwh.prices_scd',df_old)
 
+df_old.show()
 
 spark.stop()
 
