@@ -31,25 +31,18 @@ objects = minio_client.list_objects(bucket_name, prefix=prefix, recursive=True)
 
 
 for i,obj in enumerate(objects):
-    file = obj.object_name
+    file = obj.object_name.split('/')[1]
     folder = file.split('-')[2][:8]
-    source_object = CopySource(bucket_name,file)
-    if folder == '20241218':
-        # minio_client.copy_object(bucket_name,f'{folder}/{file}',source_object)
+    source_object = CopySource(bucket_name,obj.object_name)
+    minio_client.copy_object(bucket_name,f'{file}',source_object)
 
-        print(i,folder,file)
-
-
-
-# bucket_name = 'prices'
-# minio_client = init_minio_client()
-# file_name = 'prices/20240521/PriceFull7290803800003-7999-202405211349.parquet'
-# try:
-#     minio_client.stat_object(bucket_name, file_name):
-       
-# except Exception as e:
-#     print('b')
+    print(i,folder,file)
+ 
 
 
 
-  
+
+
+
+
+
