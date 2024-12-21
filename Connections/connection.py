@@ -237,7 +237,7 @@ def procuder_minio_to_kafka(spark:SparkSession, topic:str, schema:StructType):
         .option("path", f"s3a://{topic}/20241215") \
         .load()
     
-    logger.info("spark read-stream created.")
+    logger.info("spark read created.")
 
     json_df = df.select(F.to_json(F.struct([col for col in df.columns])).alias("value"))
 
@@ -249,6 +249,26 @@ def procuder_minio_to_kafka(spark:SparkSession, topic:str, schema:StructType):
         .save()
 
     logger.info("Transfer data to kafka - completed.")
+
+
+def procuder_to_kafka(spark:SparkSession,topic:str, df):
+ 
+
+    spark_df = spark.createDataFrame(df)
+    logger.info("convert DF to spark")
+
+    json_df = spark_df.select(F.to_json(F.struct([col for col in spark_df.columns])).alias("value"))
+    
+    json_df \
+    .write \
+    .format("kafka") \
+    .option("kafka.bootstrap.servers", config["Kafka"]["KAFKA_BOOTSTRAP_SERVERS"])\
+    .option("topic", topic) \
+    .save()
+
+    logger.info("Transfer data to kafka - completed.")
+
+
 
 
 #****************************************************************************************************
