@@ -112,7 +112,6 @@ def main():
                 .withColumn("snapshot_month", F.date_format(F.col("run_time"), "MMMM")) \
                 .withColumn("snapshot_quarter", F.concat_ws(" - ", F.date_format(F.col("run_time"), "yyyy"), F.quarter(F.col("run_time")))) \
                 .withColumn("is_weekend", F.when(F.date_format(F.col("file_date"), "EEEE").isin("Friday", "Saturday"), True).otherwise(False))
-                
 
             
             # Select required columns
@@ -136,6 +135,7 @@ def main():
             df = df.join(F.broadcast(df_reshatot), df.num_reshet == df_reshatot.reshet_num, "left_outer") \
                    .drop("reshet_num")
 
+
             df = df.join(F.broadcast(df_snifim), (df.num_reshet == df_snifim.snif_reshet_num) &\
                          (df.num_snif == df_snifim.snif_storeid), "left_outer") \
                    .drop("snif_storeid", "snif_reshet_num")
@@ -146,7 +146,6 @@ def main():
             
             # Add default values in the final DataFrame
             df = df\
-                .withColumn("zipcode", F.when(F.col("zipcode").isNull(), -999).otherwise(F.col("zipcode"))) \
                 .withColumn("city", F.when(F.col("city").isNull(), "Unknown").otherwise(F.col("city")))\
                 .withColumn("reshet_name", F.when(F.col("reshet_name").isNull(), "Unknown").otherwise(F.col("reshet_name")))\
                 .withColumn("storename", F.when(F.col("storename").isNull(), "Unknown").otherwise(F.col("storename")))\
@@ -173,7 +172,6 @@ def main():
             dest_postgers_datble = "dwh.prices_data"
             spark_write_data_to_postgres(spark, dest_postgers_datble, df)
             logger.info(f"Data successfully written to {dest_postgers_datble} table.")
-
 
             save_offsets(offsets_df, config["Kafka"]["PRICES_OFFSETS_FILE"])
             logger.info("Offsets saved successfully.")

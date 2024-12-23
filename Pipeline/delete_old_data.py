@@ -70,9 +70,10 @@ if __name__ == '__main__':
     # Establish connection to the database
     conn, eng = connect_to_postgres_data()
     logger.info("Database connection established.")
+    threshold = 7
 
     try:
-        delete_old_data(conn, table_name, 7)
+        delete_old_data(conn, table_name, threshold)
     except Exception as e:
         logger.error(e)
 
