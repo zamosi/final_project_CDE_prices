@@ -249,7 +249,7 @@ def upload_to_minio(minio_client, bucket_name,file_name,df:pd.DataFrame):
 def main():
     spark = SparkSession.builder \
     .master("local") \
-    .appName("WriteToKafka") \
+    .appName("FromScraperWriteToKafka") \
     .config('spark.jars.packages', config["Kafka"]["KAFKA_JAR"]) \
     .config("spark.sql.adaptive.enabled", "false") \
     .getOrCreate()
