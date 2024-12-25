@@ -66,21 +66,21 @@ with DAG(
         Load_Markets >> Run_Scraper
 
     # Task group for producers tasks
-    with TaskGroup("Producers_Tasks") as producers_tasks:
+    # with TaskGroup("Producers_Tasks") as producers_tasks:
 
-        # Task to produce snifim data
-        Snifim_Producer = SSHOperator(
-            task_id='Snifim_Producer',
-            ssh_conn_id='ssh_default',
-            command='python3 /home/developer/projects/spark-course-python/spark_course_python/final_project/final_project_CDE_prices/Pipeline/snifim_procuder.py'
-        )
+        # # Task to produce snifim data
+        # Snifim_Producer = SSHOperator(
+        #     task_id='Snifim_Producer',
+        #     ssh_conn_id='ssh_default',
+        #     command='python3 /home/developer/projects/spark-course-python/spark_course_python/final_project/final_project_CDE_prices/Pipeline/snifim_procuder.py'
+        # )
 
-        # Task to produce prices data
-        Prices_Producer = SSHOperator(
-            task_id='Prices_Producer',
-            ssh_conn_id='ssh_default',
-            command='python3 /home/developer/projects/spark-course-python/spark_course_python/final_project/final_project_CDE_prices/Pipeline/prices_procuder.py'
-        )
+        # # Task to produce prices data
+        # Prices_Producer = SSHOperator(
+        #     task_id='Prices_Producer',
+        #     ssh_conn_id='ssh_default',
+        #     command='python3 /home/developer/projects/spark-course-python/spark_course_python/final_project/final_project_CDE_prices/Pipeline/prices_procuder.py'
+        # )
 
     # Task group for consumers tasks
     with TaskGroup("Consumers_Tasks") as consumers_tasks:
@@ -119,4 +119,4 @@ with DAG(
         )
 
     # Steps of the DAG
-    [Validate_Schema, Validate_Buckets] >> scrapper_tasks >> [Snifim_Producer, Prices_Producer] >> consumers_tasks >> [Delete_Old_Data, Archive_Old_Data]
+    [Validate_Schema, Validate_Buckets] >> scrapper_tasks >> consumers_tasks >> [Delete_Old_Data, Archive_Old_Data]

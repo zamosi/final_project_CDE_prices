@@ -9,7 +9,6 @@ from io import BytesIO
 import io
 from datetime import datetime
 import re
-from configparser import ConfigParser
 
 
 # Third-Party Libraries
@@ -22,20 +21,10 @@ from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 from webdriver_manager.chrome import ChromeDriverManager
 
-from pyspark.sql import DataFrame, SparkSession
-from pyspark.sql import functions as F
-from pyspark.sql import types as T
-from pyspark.sql.types import StructType
-
 # Project custom Libs
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from Connections.connection import connect_to_postgres_data,procuder_to_kafka
+from Connections.connection import connect_to_postgres_data
 from Connections.connection import init_minio_client
-
-# Load database configuration
-config = ConfigParser()
-config.read("/home/developer/projects/spark-course-python/spark_course_python/final_project/final_project_CDE_prices/config/config.conf")
-
 
 
 # Constants
@@ -247,14 +236,6 @@ def upload_to_minio(minio_client, bucket_name,file_name,df:pd.DataFrame):
 
 
 def main():
-    spark = SparkSession.builder \
-    .master("local") \
-    .appName("WriteToKafka") \
-    .config('spark.jars.packages', config["Kafka"]["KAFKA_JAR"]) \
-    .config("spark.sql.adaptive.enabled", "false") \
-    .getOrCreate()
-
-
     error_file = []
     try:
         # Connect to PostgreSQL and insert the DataFrame
@@ -292,10 +273,6 @@ def main():
                 continue
             
             for i,file in enumerate(xml_files):
-
-                # if i==1:
-                #     break
-
                 # Create a session with cookies to use for file download
                 file_url = f"{BASE_URL}{file}"
                 logger.info(f"Fetching file: {file} file{i}")
@@ -312,7 +289,6 @@ def main():
                         df = download_and_parse_xml(session, file_url,file)
                         logger.info(f"DataFrame created with {len(df)} rows.")
                         upload_to_minio(minio_client, target_table_name,file_n,df)
-                        procuder_to_kafka(spark,target_table_name,df)
 
                 except Exception as e:
                     logger.error(f"An error occurred when file download - {file}:{e}")
