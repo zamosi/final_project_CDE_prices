@@ -234,7 +234,7 @@ def procuder_minio_to_kafka(spark:SparkSession, topic:str, schema:StructType):
         .format("parquet") \
         .schema(schema)\
         .option("kafka.group.id", "myConsumerGroup")\
-        .option("path", f"s3a://{topic}/20241215") \
+        .option("path", f"s3a://{topic}") \
         .load()
     
     logger.info("spark read created.")
