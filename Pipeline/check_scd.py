@@ -111,31 +111,7 @@ def spark_apply_scd_type2(spark:SparkSession ,df_old,df_new):
     return df_final
 
 
-topic= 'prices'
 
-prices_schema = T.StructType([T.StructField('priceupdatedate',T.StringType(),True),
-                            T.StructField('itemcode',T.StringType(),True),
-                            T.StructField('itemtype',T.StringType(),True),
-                            T.StructField('itemname',T.StringType(),True),
-                            T.StructField('manufacturername',T.StringType(),True),
-                            T.StructField('manufacturecountry',T.StringType(),True),
-                            T.StructField('manufactureritemdescription',T.StringType(),True),
-                            T.StructField('unitqty',T.StringType(),True),
-                            T.StructField('quantity',T.StringType(),True),
-                            T.StructField('unitofmeasure',T.StringType(),True),
-                            T.StructField('bisweighted',T.StringType(),True),
-                            T.StructField('qtyinpackage',T.StringType(),True),
-                            T.StructField('itemprice',T.StringType(),True),
-                            T.StructField('unitofmeasureprice',T.StringType(),True),
-                            T.StructField('allowdiscount',T.StringType(),True),
-                            T.StructField('itemstatus',T.StringType(),True),
-                            T.StructField('itemid',T.StringType(),True),
-                            T.StructField('file_name',T.StringType(),True),
-                            T.StructField('num_reshet',T.StringType(),True),
-                            T.StructField('num_snif',T.StringType(),True),
-                            T.StructField('file_date',T.TimestampType(),True),
-                            T.StructField('run_time',T.TimestampType(),True)
-                            ])
 
 
 spark = SparkSession \
@@ -148,49 +124,89 @@ spark = SparkSession \
 .config("spark.jars", config["Core_Settings"]["POSTGRES_JDBC_DRIVERS_PATH"])\
 .getOrCreate()
 
-try:
-    df_old = spark_read_data_from_postgres(spark,'dwh.prices_scd')
-    logger.info(f"load table dwh.prices_scd from postgres")
-except Exception as e:
-    logger.error(f"table not load {e}")
-    raise
+# try:
+#     df_old = spark_read_data_from_postgres(spark,'dwh.prices_scd')
+#     logger.info(f"load table dwh.prices_scd from postgres")
+# except Exception as e:
+#     logger.error(f"table not load {e}")
+#     raise
 
-# Consumer group
-consumer_group = config["Kafka"]["scd_CONSUMER_GROUP"]
-# Path to offset files
-offset_files = config["Kafka"]["SCD_OFFSETS_FILE"]
+# # Consumer group
+# consumer_group = config["Kafka"]["scd_CONSUMER_GROUP"]
+# # Path to offset files
+# offset_files = config["Kafka"]["SCD_OFFSETS_FILE"]
 
-#load new data from kafka
+# #load new data from kafka
 
-try:
-    # Consume Kafka stream with offsets
-    df_with_metadata = spark_consumer_to_df(spark, topic, prices_schema, offset_files, consumer_group)
-    # Extract offsets immediately for saving
-    offsets_df = df_with_metadata.select("topic", "partition", "offset").distinct()
+# try:
+#     # Consume Kafka stream with offsets
+#     df_with_metadata = spark_consumer_to_df(spark, topic, prices_schema, offset_files, consumer_group)
+#     # Extract offsets immediately for saving
+#     offsets_df = df_with_metadata.select("topic", "partition", "offset").distinct()
     
 
-    # Drop metadata columns to prevent further errors
-    df_new = df_with_metadata.drop("topic", "partition", "offset")
+#     # Drop metadata columns to prevent further errors
+#     df_new = df_with_metadata.drop("topic", "partition", "offset")
     
-    logger.info(f"consumer load data to df")
-except Exception as e:
-    logger.error(f"consumer not load {e}")
-    raise
+#     logger.info(f"consumer load data to df")
+# except Exception as e:
+#     logger.error(f"consumer not load {e}")
+#     raise
 
 
-#fiter just files "PriceFull"
-df_new_full = df_new.filter(F.col("file_name").startswith("PriceFull")& (F.col('num_reshet') == '7290700100008')) \
-                    .withColumn("file_date2",F.to_date(F.col("file_date")))
+schema = T.StructType([
+    T.StructField("itemcode", T.LongType(), True),
+    T.StructField("itemname", T.StringType(), True),
+    T.StructField("itemprice", T.LongType(), True),
+    T.StructField("StartDate", T.DateType(), True),  # אפשר להחליף ל-DateType אם נדרש
+    T.StructField("EndDate", T.DateType(), True),
+    T.StructField("IsActive", T.IntegerType(), True),
+    T.StructField("num_reshet", T.LongType(), True),
+    T.StructField("num_snif", T.IntegerType(), True),
+])
 
-#add row_number column that give item per reshet,snif,day
-window_spec = Window.partitionBy("itemcode", "num_reshet","num_snif","file_date2").orderBy(F.col("file_date").desc())
-df_with_row_number = df_new_full.withColumn("rn", F.row_number().over(window_spec))
+df_old = spark.createDataFrame(
+    [
 
-#filter the max item according to date and max time
-df_wo_duplicates_per_day = df_with_row_number.filter(F.col("rn")==1)
+    # (1, "Product A", 10, "2024-01-01", None, 1,1,1),
+    # (1, "Product A", 15, "2024-02-01", None, 1,1,1),
+    # (2, "Product B", 20, "2024-01-01", None, 1,1,1),
+    # (4, "Product D", 30, "2024-01-01", None, 1,1,1)
+], schema
+# ["itemcode", "itemname", "itemprice", "StartDate", "EndDate", "IsActive","num_reshet","num_snif"]
+)
+
+# דוגמת טבלת source עם נתונים חדשים
+df_new = spark.createDataFrame([
+    (1, "Product A", 15, "2024-02-10",1,1),
+    (2, "Product B", 25, "2024-02-10",1,1),
+    (3, "Product C", 30, "2024-02-10",1,1),
+    (1, "Product A", 11, "2024-02-11",1,1),
+    (2, "Product B", 25, "2024-02-11",1,1),
+    (3, "Product C", 30, "2024-02-11",1,1),
+    (1, "Product A", 20, "2024-02-12",1,1),
+    (2, "Product B", 12, "2024-02-13",1,1),
+    (2, "Product B", 12, "2024-02-14",1,1),
+    (2, "Product B", 12, "2024-02-15",1,2)
+], 
+["itemcode", "itemname", "itemprice", "file_date2","num_reshet","num_snif"]
+)
 
 
-df_wo_duplicates_per_day_conv = df_wo_duplicates_per_day.select(
+
+# #fiter just files "PriceFull"
+# df_new_full = df_new.filter(F.col("file_name").startswith("PriceFull")& (F.col('num_reshet') == '7290700100008')) \
+#                     .withColumn("file_date2",F.to_date(F.col("file_date")))
+
+# #add row_number column that give item per reshet,snif,day
+# window_spec = Window.partitionBy("itemcode", "num_reshet","num_snif","file_date2").orderBy(F.col("file_date").desc())
+# df_with_row_number = df_new_full.withColumn("rn", F.row_number().over(window_spec))
+
+# #filter the max item according to date and max time
+# df_wo_duplicates_per_day = df_with_row_number.filter(F.col("rn")==1)
+
+
+df_wo_duplicates_per_day_conv = df_new.select(
     F.col('itemcode').cast('bigint')\
     ,F.col('itemname').cast('string')\
     ,F.col('itemprice').cast('float')\
@@ -214,13 +230,7 @@ for date in dates:
 
 
 
-conn, engine = connect_to_postgres_data()
-
-save_offsets(offsets_df, offset_files)
-
-truncate_table_in_postgres(conn,'dwh.prices_scd')
-spark_write_data_to_postgres(spark,'dwh.prices_scd',df_result)
-
+df_old.show()
 
 spark.stop()
 

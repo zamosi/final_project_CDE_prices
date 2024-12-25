@@ -26,18 +26,23 @@ from Connections.connection import init_minio_client
 
 minio_client = init_minio_client()
 bucket_name = 'prices'
-prefix = ''
+prefix = '20241215'
 objects = minio_client.list_objects(bucket_name, prefix=prefix, recursive=True)
 
 
-for i,obj in enumerate(objects):
-    file = obj.object_name.split('/')[1]
-    folder = file.split('-')[2][:8]
-    source_object = CopySource(bucket_name,obj.object_name)
-    minio_client.copy_object(bucket_name,f'{file}',source_object)
+# for i,obj in enumerate(objects):
+#     file = obj.object_name
+#     folder = file.split('-')[2][:8]
+    # source_object = CopySource(bucket_name,obj.object_name)
+    # minio_client.copy_object(bucket_name,f'{folder}/{file}',source_object)
 
-    print(i,folder,file)
- 
+l = []
+for obj in objects:
+    l.append(obj.object_name)
+
+print(len(l))
+print(len(list(set(l))))
+
 
 
 
