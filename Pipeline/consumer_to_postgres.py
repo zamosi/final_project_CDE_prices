@@ -31,9 +31,15 @@ logger = logging.getLogger(__name__)
 def spark_apply_scd_type2(spark:SparkSession ,df_old,df_new):
 
     target = df_old.withColumnRenamed("itemprice", "itemprice_o")\
-                    .withColumnRenamed("itemname", "itemname_o")
+                    .withColumnRenamed("itemname", "itemname_o")\
+                    .withColumnRenamed("StartDate", "StartDate_o")\
+                    .withColumnRenamed("EndDate", "EndDate_o")\
+                    .withColumnRenamed("IsActive", "IsActive_o")\
+                    .withColumnRenamed("Action", "Action_o")
+                    
 
     source = df_new.withColumnRenamed("itemprice", "itemprice_n")\
+                    .withColumnRenamed("file_date", "file_date_n")\
                     .withColumnRenamed("itemname", "itemname_n")
 
     target_alias = target.alias("o")
@@ -44,31 +50,33 @@ def spark_apply_scd_type2(spark:SparkSession ,df_old,df_new):
     try:
 
 
-        df_new_update = source_alias.join(target_alias.filter(F.col("o.IsActive")==1),
-                                    ["itemcode","num_reshet","num_snif"],
-                                    "outer") \
+        df_new_update = source_alias.join(target_alias.filter(F.col("o.IsActive_o")==1),
+                                        ["itemcode","num_reshet","num_snif"],
+                                    "outer")\
             .withColumn("Action",
                         F.when(F.col("o.itemprice_o").isNull(), F.lit("NEW"))
                         .when(F.col("n.itemprice_n").isNull(), F.lit("OLD"))
                         .when(F.col("n.itemprice_n") != F.col("o.itemprice_o"), F.lit("UPDATE"))
                         .otherwise(F.lit("NO_CHANGE")))\
             .withColumn("StartDate",
-                        F.when(F.col("Action")=="NEW",F.col("n.file_date"))
-                        .otherwise(F.col("o.StartDate")))\
+                        F.when(F.col("Action")=="NEW",F.col("n.file_date_n"))
+                        .otherwise(F.col("o.StartDate_o")))\
             .withColumn("EndDate",
-                        F.when(F.col("Action")=="UPDATE",F.col("n.file_date"))
-                        .otherwise(F.col("o.EndDate")))\
+                        F.when(F.col("Action")=="UPDATE",F.col("n.file_date_n"))
+                        .otherwise(F.col("o.EndDate_o")))\
             .withColumn("IsActive",
                         F.when(F.col("Action")=="NEW",F.lit(1))
                         .when(F.col("Action")=="UPDATE",F.lit(0))
-                        .otherwise(F.col("o.IsActive"))) \
+                        .otherwise(F.col("o.IsActive_o"))) \
             .withColumn("itemprice",
                         F.when(F.col("Action")=="NEW",F.col("n.itemprice_n"))
                         .otherwise(F.col("o.itemprice_o")))\
             .withColumn("itemname",
                         F.when(F.col("Action")=="NEW",F.col("n.itemname_n"))
-                        .otherwise(F.col("o.itemname_o")))  
+                        .otherwise(F.col("o.itemname_o")))
+
         
+
 
         df_new_update_change_col = df_new_update\
             .select(F.col("itemcode"),F.col("itemname"),F.col("num_reshet"),F.col("num_snif"),F.col("StartDate"),F.col("EndDate"),F.col("IsActive"),F.col("itemprice"),F.col("Action"))
@@ -83,7 +91,7 @@ def spark_apply_scd_type2(spark:SparkSession ,df_old,df_new):
         df_add_row = df_new_update.filter(F.col("Action") == "UPDATE")\
             .withColumn("IsActive",F.lit(1))\
             .withColumn("EndDate",F.lit(None))\
-            .select(F.col("itemcode"),F.col("itemname_n").alias("itemname"),F.col("num_reshet"),F.col("num_snif"),F.col("n.file_date").alias("StartDate"),F.col("EndDate"),F.col("IsActive"),F.col("itemprice_n").alias("itemprice"),F.col("Action"))
+            .select(F.col("itemcode"),F.col("itemname"),F.col("num_reshet"),F.col("num_snif"),F.col("n.file_date_n").alias("StartDate"),F.col("EndDate"),F.col("IsActive"),F.col("n.itemprice_n").alias("itemprice"),F.lit("UPDATE-open").alias("Action"))
 
         logger.info("succeeded-scd-pop2")
     except Exception as e:
@@ -91,8 +99,8 @@ def spark_apply_scd_type2(spark:SparkSession ,df_old,df_new):
         raise
 
     try:
-        df_not_active = target.filter(F.col("IsActive")==0)\
-            .select(F.col("itemcode"),F.col("itemname_o").alias("itemname"),F.col("num_reshet"),F.col("num_snif"),F.col("StartDate"),F.col("EndDate"),F.col("IsActive"),F.col("itemprice_o").alias("itemprice"),F.lit("close").alias("Action"))
+        df_not_active = target.filter(F.col("IsActive_o")==0)\
+            .select(F.col("itemcode"),F.col("itemname_o").alias("itemname"),F.col("num_reshet"),F.col("num_snif"),F.col("StartDate_o").alias("StartDate"),F.col("EndDate_o").alias("EndDate"),F.col("IsActive_o").alias("IsActive"),F.col("itemprice_o").alias("itemprice"),F.lit("close").alias("Action"))
         
         logger.info("succeeded-scd-pop3")
     except Exception as e:
@@ -148,12 +156,7 @@ spark = SparkSession \
 .config("spark.jars", config["Core_Settings"]["POSTGRES_JDBC_DRIVERS_PATH"])\
 .getOrCreate()
 
-try:
-    df_old = spark_read_data_from_postgres(spark,'dwh.prices_scd')
-    logger.info(f"load table dwh.prices_scd from postgres")
-except Exception as e:
-    logger.error(f"table not load {e}")
-    raise
+
 
 # Consumer group
 consumer_group = config["Kafka"]["scd_CONSUMER_GROUP"]
@@ -199,20 +202,32 @@ df_wo_duplicates_per_day_conv = df_wo_duplicates_per_day.select(
     ,F.col('num_snif').cast('int')
         )
 
+
+
+try:
+    df_old = spark_read_data_from_postgres(spark,'dwh.prices_scd')
+    df_old.cache()
+    logger.info(f"load table dwh.prices_scd from postgres - {df_old.count()} rows")
+except Exception as e:
+    logger.error(f"table not load {e}")
+    raise
+
 #date uniqe in new data
-dates = sorted(df_wo_duplicates_per_day_conv.select("file_date").distinct().rdd.flatMap(lambda x: x).collect())
-logger.info(f"{dates} start")
-#loop each date and doing scd between date and old data.
-for date in dates:
-    logger.info(f"{date} start")
+# dates = sorted(df_wo_duplicates_per_day_conv.select("file_date").distinct().rdd.flatMap(lambda x: x).collect())
+# logger.info(f"{dates} start")
+# #loop each date and doing scd between date and old data.
+# for date in dates:
+#     logger.info(f"{date} start")
 
-    df_filtered_day = df_wo_duplicates_per_day_conv.filter(F.col("file_date") == date)
+#     df_filtered_day = df_wo_duplicates_per_day_conv.filter(F.col("file_date") == date)
 
-    df_result = spark_apply_scd_type2(spark,df_old, df_filtered_day)
+#     df_result = spark_apply_scd_type2(spark,df_old, df_filtered_day)
     
-    df_old = df_result
+#     df_old = df_result
 
 
+
+df_result = spark_apply_scd_type2(spark,df_old, df_wo_duplicates_per_day_conv)
 
 conn, engine = connect_to_postgres_data()
 
@@ -221,7 +236,7 @@ save_offsets(offsets_df, offset_files)
 truncate_table_in_postgres(conn,'dwh.prices_scd')
 spark_write_data_to_postgres(spark,'dwh.prices_scd',df_result)
 
-
+# df_result.show()
 spark.stop()
 
 

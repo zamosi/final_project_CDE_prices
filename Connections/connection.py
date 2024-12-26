@@ -104,7 +104,7 @@ def spark_read_data_from_postgres(spark: SparkSession, table_name: str) -> DataF
     return df
 
 
-def spark_write_data_to_postgres(spark: SparkSession, table_name: str,df):
+def spark_write_data_to_postgres(spark: SparkSession, table_name: str,df,mode="append"):
     """
     Writes a Spark DataFrame to a PostgreSQL database table.
     """
@@ -119,7 +119,7 @@ def spark_write_data_to_postgres(spark: SparkSession, table_name: str,df):
         }
 
     df.write \
-        .jdbc(url=postgres_options["url"], table=postgres_options["dbtable"], mode="append", properties=postgres_options) 
+        .jdbc(url=postgres_options["url"], table=postgres_options["dbtable"], mode=mode, properties=postgres_options) 
 
 
 #****************************************************************************************************
@@ -234,7 +234,7 @@ def procuder_minio_to_kafka(spark:SparkSession, topic:str, schema:StructType):
         .format("parquet") \
         .schema(schema)\
         .option("kafka.group.id", "myConsumerGroup")\
-        .option("path", f"s3a://{topic}/20241212") \
+        .option("path", f"s3a://{topic}") \
         .load()
     
     logger.info("spark read created.")
